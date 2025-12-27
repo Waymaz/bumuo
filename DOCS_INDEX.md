@@ -1,6 +1,6 @@
-# 📚 CodeVerse Documentation Index
+# 📚 BumuO Documentation Index
 
-Welcome to CodeVerse! This guide will help you navigate all the documentation.
+Welcome to BumuO! This guide will help you navigate all the documentation.
 
 ## 🚀 Getting Started (Start Here!)
 

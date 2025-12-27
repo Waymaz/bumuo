@@ -1,4 +1,4 @@
-# CodeVerse - Collaborative Coding Sandbox Platform
+# BumuO - Collaborative Coding Sandbox Platform
 
 A production-ready web-based collaborative coding sandbox platform built with React, Tailwind CSS, Supabase, and Monaco Editor.
 
