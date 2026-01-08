@@ -106,8 +106,11 @@ export const Editor = () => {
   const verticalResize = useResizable([33.33, 33.33, 33.34], 'vertical')
   const horizontalResize = useResizable([33.33, 33.33, 33.34], 'horizontal')
   
-  // Main panel split (editors vs preview)
-  const [editorPanelSize, setEditorPanelSize] = useState(50) // percentage
+  // Main panel split (editors vs preview) - Load from localStorage or default to 50%
+  const [editorPanelSize, setEditorPanelSize] = useState(() => {
+    const saved = localStorage.getItem('bumuo-editor-panel-size')
+    return saved ? parseFloat(saved) : 50
+  })
   const [isCodePanelHidden, setIsCodePanelHidden] = useState(false)
   const mainSplitRef = useRef(null)
   const mainDragging = useRef(false)
@@ -150,6 +153,10 @@ export const Editor = () => {
     }
 
     const handleMainMouseUp = () => {
+      if (mainDragging.current) {
+        // Save to localStorage when resize ends
+        localStorage.setItem('bumuo-editor-panel-size', editorPanelSize.toString())
+      }
       mainDragging.current = false
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
@@ -161,7 +168,7 @@ export const Editor = () => {
       document.removeEventListener('mousemove', handleMainMouseMove)
       document.removeEventListener('mouseup', handleMainMouseUp)
     }
-  }, [previewPosition])
+  }, [previewPosition, editorPanelSize])
 
   useEffect(() => {
     loadProject()
@@ -679,19 +686,20 @@ export const Editor = () => {
       {/* Mobile Tab Bar */}
       <div 
         style={{
-          display: 'flex',
           borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
           background: 'rgba(15, 15, 23, 0.95)',
+          minHeight: '48px',
+          flexShrink: 0,
         }}
-        className="visible-mobile"
+        className="mobile-tab-bar"
       >
         {['html', 'css', 'js', 'preview'].map((tab) => {
           const isActive = activeTab === tab
           const tabColors = {
-            html: { icon: Code, color: '#fb923c' },
-            css: { icon: Palette, color: '#22d3ee' },
-            js: { icon: Zap, color: '#facc15' },
-            preview: { icon: Eye, color: '#34d399' },
+            html: { icon: Code, color: '#fb923c', label: 'HTML' },
+            css: { icon: Palette, color: '#22d3ee', label: 'CSS' },
+            js: { icon: Zap, color: '#facc15', label: 'JS' },
+            preview: { icon: Eye, color: '#34d399', label: 'Preview' },
           }
           const TabIcon = tabColors[tab].icon
           
@@ -700,10 +708,12 @@ export const Editor = () => {
               key={tab}
               onClick={() => setActiveTab(tab)}
               style={{
-                flex: 1,
-                padding: '14px 16px',
-                fontSize: '14px',
-                fontWeight: 500,
+                flex: '1 1 0',
+                minWidth: 0,
+                padding: '12px 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                letterSpacing: '0.02em',
                 transition: 'all 0.2s ease',
                 borderBottom: isActive ? '2px solid var(--color-primary-500)' : '2px solid transparent',
                 background: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
@@ -713,13 +723,17 @@ export const Editor = () => {
                 borderBottomStyle: 'solid',
                 cursor: 'pointer',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '4px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
-              <TabIcon style={{ width: '16px', height: '16px', color: tabColors[tab].color }} />
-              {tab.toUpperCase()}
+              <TabIcon style={{ width: '18px', height: '18px', color: tabColors[tab].color, flexShrink: 0 }} />
+              <span style={{ lineHeight: 1 }}>{tabColors[tab].label}</span>
             </button>
           )
         })}
@@ -944,26 +958,42 @@ export const Editor = () => {
           style={{
             flex: 1,
             background: '#ffffff',
+            minHeight: 0,
+            position: 'relative',
           }}
-          className="visible-mobile"
+          className="mobile-content-area"
         >
-          {activeTab === 'html' && <CodeEditor language="html" value={html} onChange={setHtml} theme="light" />}
-          {activeTab === 'css' && <CodeEditor language="css" value={css} onChange={setCss} theme="light" />}
-          {activeTab === 'js' && <CodeEditor language="javascript" value={js} onChange={setJs} theme="light" />}
+          {activeTab === 'html' && (
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <CodeEditor language="html" value={html} onChange={setHtml} theme="light" />
+            </div>
+          )}
+          {activeTab === 'css' && (
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <CodeEditor language="css" value={css} onChange={setCss} theme="light" />
+            </div>
+          )}
+          {activeTab === 'js' && (
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <CodeEditor language="javascript" value={js} onChange={setJs} theme="light" />
+            </div>
+          )}
           {activeTab === 'preview' && (
-            <PreviewSection 
-              previewKey={previewKey} 
-              html={html} 
-              css={css} 
-              js={js}
-              previewDevice={previewDevice}
-              setPreviewDevice={setPreviewDevice}
-              showDeviceMenu={showDeviceMenu}
-              setShowDeviceMenu={setShowDeviceMenu}
-              getDeviceWidth={getDeviceWidth}
-              setPreviewKey={setPreviewKey}
-              isMobile={true}
-            />
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <PreviewSection 
+                previewKey={previewKey} 
+                html={html} 
+                css={css} 
+                js={js}
+                previewDevice={previewDevice}
+                setPreviewDevice={setPreviewDevice}
+                showDeviceMenu={showDeviceMenu}
+                setShowDeviceMenu={setShowDeviceMenu}
+                getDeviceWidth={getDeviceWidth}
+                setPreviewKey={setPreviewKey}
+                isMobile={true}
+              />
+            </div>
           )}
         </div>
 
@@ -1023,6 +1053,8 @@ export const Editor = () => {
         @media (min-width: 1024px) {
           .hidden-mobile { display: flex !important; }
           .visible-mobile { display: none !important; }
+          .mobile-tab-bar { display: none !important; }
+          .mobile-content-area { display: none !important; }
           .code-editors-desktop { display: flex !important; }
           .preview-pane-desktop { display: flex !important; }
           .main-resize-handle { display: flex !important; }
@@ -1030,6 +1062,8 @@ export const Editor = () => {
         @media (max-width: 1023px) {
           .hidden-mobile { display: none !important; }
           .visible-mobile { display: flex !important; }
+          .mobile-tab-bar { display: flex !important; }
+          .mobile-content-area { display: block !important; }
           .code-editors-desktop { display: none !important; }
           .preview-pane-desktop { display: none !important; }
           .main-resize-handle { display: none !important; }
