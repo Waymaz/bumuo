@@ -117,7 +117,7 @@ Welcome to BumuO! This guide will help you navigate all the documentation.
 ## 📊 Documentation Map
 
 ```
-CodeVerse Documentation
+BumuO Documentation
 │
 ├── 🚀 Getting Started
 │   ├── QUICKSTART.md (Start here!)

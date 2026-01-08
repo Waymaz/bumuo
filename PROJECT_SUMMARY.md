@@ -1,4 +1,4 @@
-# 🎉 CodeVerse - Project Complete!
+# 🎉 BumuO - Project Complete!
 
 ## ✅ What's Been Built
 
@@ -53,7 +53,7 @@ A **production-ready collaborative coding sandbox platform** with:
 ## 📂 Project Structure
 
 ```
-codeverse/
+BumuO/
 ├── src/
 │   ├── components/          # Reusable UI components
 │   │   ├── CodeEditor.jsx   # Monaco editor wrapper

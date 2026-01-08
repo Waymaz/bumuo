@@ -1,4 +1,4 @@
--- CodeVerse Database Schema
+-- BumuO Database Schema
 -- Run this in your Supabase SQL Editor
 
 -- Create projects table

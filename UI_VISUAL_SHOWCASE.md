@@ -1,4 +1,4 @@
-# 🎨 CodeVerse Premium UI - Visual Showcase
+# 🎨 BumuO Premium UI - Visual Showcase
 
 ## 🌟 Premium Design Patterns in Action
 
@@ -322,7 +322,7 @@ Multi-color gradient text for logos and headings.
 ### Code
 ```jsx
 <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-  CodeVerse
+  BumuO
 </h1>
 ```
 
@@ -430,4 +430,4 @@ All patterns are production-ready and optimized for performance!
 
 ---
 
-**These patterns make CodeVerse feel premium, modern, and delightful to use.** ✨
+**These patterns make BumuO feel premium, modern, and delightful to use.** ✨

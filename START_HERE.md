@@ -1,4 +1,4 @@
-# 🎉 Welcome to CodeVerse!
+# 🎉 Welcome to BumuO!
 
 ## ⚡ Quick Start (5 Minutes)
 

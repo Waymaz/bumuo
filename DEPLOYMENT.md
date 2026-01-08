@@ -1,4 +1,4 @@
-# 🚀 CodeVerse Deployment Checklist
+# 🚀 BumuO Deployment Checklist
 
 ## Pre-Deployment
 

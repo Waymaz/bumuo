@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Code2, Sparkles } from 'lucide-react'
+import { Plus, Code2, Sparkles, Search, Grid3X3, List, Folder, X } from 'lucide-react'
 import { Navbar } from '../components/Navbar'
 import { ProjectCard } from '../components/ProjectCard'
 import { useAuth } from '../context/AuthContext'
@@ -10,6 +10,8 @@ export const Dashboard = () => {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [newProjectTitle, setNewProjectTitle] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [viewMode, setViewMode] = useState('grid')
   const { user } = useAuth()
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export const Dashboard = () => {
   }
 
   const handleDeleteProject = async (id) => {
-    if (!confirm('Are you sure you want to delete this project?')) return
+    if (!confirm('Are you sure you want to delete this project? This action cannot be undone.')) return
 
     const { error } = await projectService.deleteProject(id)
     
@@ -49,72 +51,397 @@ export const Dashboard = () => {
     }
   }
 
+  const filteredProjects = projects.filter(project =>
+    project.title.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Shared styles
+  const buttonPrimaryStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '12px 20px',
+    background: 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%)',
+    color: '#ffffff',
+    borderRadius: '12px',
+    fontWeight: 600,
+    fontSize: '15px',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 14px rgba(59, 130, 246, 0.25)',
+  }
+
+  const inputStyle = {
+    width: '100%',
+    padding: '12px 16px',
+    paddingLeft: '44px',
+    background: 'var(--color-surface-850)',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    borderRadius: '12px',
+    color: '#ffffff',
+    fontSize: '15px',
+    outline: 'none',
+    transition: 'all 0.2s ease',
+  }
+
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0e14' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-surface-950)' }}>
       <Navbar />
       
-      <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '3rem 1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem', flexWrap: 'wrap', gap: '1.5rem' }}>
-          <div>
-            <h1 style={{ fontSize: '2.25rem', fontWeight: 700, color: 'white', marginBottom: '0.5rem' }}>My Projects</h1>
-            <p style={{ color: '#9ca3af', fontSize: '1rem' }}>Create and manage your coding projects</p>
+      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '32px 24px' }}>
+        {/* Header */}
+        <div 
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '24px',
+            marginBottom: '40px',
+          }}
+        >
+          <div style={{ animation: 'fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+            <h1 
+              style={{
+                fontSize: '28px',
+                fontWeight: 700,
+                color: '#ffffff',
+                marginBottom: '8px',
+                letterSpacing: '-0.025em',
+              }}
+            >
+              My Projects
+            </h1>
+            <p style={{ color: 'var(--color-surface-400)', fontSize: '15px', margin: 0 }}>
+              Create and manage your coding projects
+            </p>
           </div>
           
           <button
             onClick={() => setShowModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-            onMouseOver={(e) => e.currentTarget.style.background = '#2563eb'}
-            onMouseOut={(e) => e.currentTarget.style.background = '#3b82f6'}
+            style={buttonPrimaryStyle}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-400) 100%)'
+              e.target.style.transform = 'translateY(-2px)'
+              e.target.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.35)'
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%)'
+              e.target.style.transform = 'translateY(0)'
+              e.target.style.boxShadow = '0 4px 14px rgba(59, 130, 246, 0.25)'
+            }}
           >
-            <Plus style={{ width: '1.25rem', height: '1.25rem' }} />
+            <Plus style={{ width: '20px', height: '20px' }} />
             New Project
           </button>
         </div>
 
-        {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8rem 0' }}>
-            <div style={{ position: 'relative' }}>
-              <div style={{ width: '4rem', height: '4rem', border: '3px solid transparent', borderTopColor: '#3b82f6', borderBottomColor: '#3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+        {/* Search and View Controls */}
+        {projects.length > 0 && (
+          <div 
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '16px',
+              marginBottom: '28px',
+              animation: 'fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both',
+            }}
+          >
+            <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+              <Search 
+                style={{
+                  position: 'absolute',
+                  left: '14px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '18px',
+                  height: '18px',
+                  color: 'var(--color-surface-500)',
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search projects..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={inputStyle}
+                onFocus={(e) => {
+                  e.target.style.borderColor = 'rgba(59, 130, 246, 0.5)'
+                  e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.15)'
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.06)'
+                  e.target.style.boxShadow = 'none'
+                }}
+              />
             </div>
-            <p style={{ marginTop: '1.5rem', color: '#9ca3af' }}>Loading your projects...</p>
+            <div 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px',
+                background: 'var(--color-surface-850)',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+              }}
+            >
+              <button
+                onClick={() => setViewMode('grid')}
+                style={{
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  background: viewMode === 'grid' ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                  color: viewMode === 'grid' ? 'var(--color-primary-400)' : 'var(--color-surface-500)',
+                }}
+                title="Grid view"
+              >
+                <Grid3X3 style={{ width: '18px', height: '18px' }} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                style={{
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  background: viewMode === 'list' ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                  color: viewMode === 'list' ? 'var(--color-primary-400)' : 'var(--color-surface-500)',
+                }}
+                title="List view"
+              >
+                <List style={{ width: '18px', height: '18px' }} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Content */}
+        {loading ? (
+          <div 
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '80px 0',
+            }}
+          >
+            <div 
+              style={{
+                width: '56px',
+                height: '56px',
+                border: '4px solid var(--color-surface-700)',
+                borderTopColor: 'var(--color-primary-500)',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+              }}
+            />
+            <p style={{ marginTop: '24px', color: 'var(--color-surface-400)', fontWeight: 500 }}>
+              Loading your projects...
+            </p>
           </div>
         ) : projects.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '8rem 0' }}>
-            <Code2 style={{ width: '6rem', height: '6rem', color: '#4b5563', margin: '0 auto 1.5rem' }} />
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'white', marginBottom: '0.75rem' }}>No projects yet</h3>
-            <p style={{ color: '#9ca3af', fontSize: '1.125rem', marginBottom: '2rem' }}>Create your first project and start coding</p>
+          <div 
+            style={{
+              textAlign: 'center',
+              padding: '80px 16px',
+              animation: 'fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            <div 
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '88px',
+                height: '88px',
+                background: 'var(--color-surface-800)',
+                borderRadius: '20px',
+                marginBottom: '24px',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+              }}
+            >
+              <Folder style={{ width: '40px', height: '40px', color: 'var(--color-surface-500)' }} />
+            </div>
+            <h3 
+              style={{
+                fontSize: '22px',
+                fontWeight: 700,
+                color: '#ffffff',
+                marginBottom: '12px',
+              }}
+            >
+              No projects yet
+            </h3>
+            <p 
+              style={{
+                color: 'var(--color-surface-400)',
+                fontSize: '16px',
+                marginBottom: '32px',
+                maxWidth: '400px',
+                marginLeft: 'auto',
+                marginRight: 'auto',
+              }}
+            >
+              Create your first project and start coding with HTML, CSS, and JavaScript
+            </p>
             <button
               onClick={() => setShowModal(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+              style={buttonPrimaryStyle}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-400) 100%)'
+                e.target.style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%)'
+                e.target.style.transform = 'translateY(0)'
+              }}
             >
-              <Plus style={{ width: '1.25rem', height: '1.25rem' }} />
-              Create Project
+              <Plus style={{ width: '20px', height: '20px' }} />
+              Create Your First Project
+            </button>
+          </div>
+        ) : filteredProjects.length === 0 ? (
+          <div 
+            style={{
+              textAlign: 'center',
+              padding: '80px 16px',
+              animation: 'fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            <div 
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '80px',
+                height: '80px',
+                background: 'var(--color-surface-800)',
+                borderRadius: '20px',
+                marginBottom: '24px',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+              }}
+            >
+              <Search style={{ width: '36px', height: '36px', color: 'var(--color-surface-500)' }} />
+            </div>
+            <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#ffffff', marginBottom: '8px' }}>
+              No matches found
+            </h3>
+            <p style={{ color: 'var(--color-surface-400)', marginBottom: '16px' }}>
+              Try adjusting your search terms
+            </p>
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--color-primary-400)',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'color 0.2s ease',
+              }}
+              onMouseEnter={(e) => e.target.style.color = 'var(--color-primary-300)'}
+              onMouseLeave={(e) => e.target.style.color = 'var(--color-primary-400)'}
+            >
+              Clear search
             </button>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-            {projects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onDelete={handleDeleteProject}
-              />
-            ))}
-          </div>
+          <>
+            <p style={{ fontSize: '14px', color: 'var(--color-surface-500)', marginBottom: '16px' }}>
+              {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
+            </p>
+            <div 
+              style={{
+                display: 'grid',
+                gridTemplateColumns: viewMode === 'grid' 
+                  ? 'repeat(auto-fill, minmax(300px, 1fr))' 
+                  : '1fr',
+                gap: viewMode === 'grid' ? '24px' : '12px',
+              }}
+            >
+              {filteredProjects.map((project, index) => (
+                <div 
+                  key={project.id} 
+                  style={{ 
+                    animation: `fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.05}s both` 
+                  }}
+                >
+                  <ProjectCard
+                    project={project}
+                    onDelete={handleDeleteProject}
+                    viewMode={viewMode}
+                  />
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
+      {/* Create Project Modal */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 50 }}>
-          <div style={{ background: '#151a21', border: '1px solid #1f2937', borderRadius: '1rem', padding: '2rem', maxWidth: '28rem', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <Sparkles style={{ width: '1.5rem', height: '1.5rem', color: '#60a5fa' }} />
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'white' }}>Create New Project</h2>
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            zIndex: 50,
+          }}
+          onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
+        >
+          <div 
+            style={{
+              background: 'rgba(18, 18, 28, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '20px',
+              padding: '32px',
+              maxWidth: '420px',
+              width: '100%',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)',
+              animation: 'scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '28px' }}>
+              <div 
+                style={{
+                  padding: '12px',
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  borderRadius: '14px',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                }}
+              >
+                <Sparkles style={{ width: '24px', height: '24px', color: 'var(--color-primary-400)' }} />
+              </div>
+              <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+                Create New Project
+              </h2>
             </div>
             
-            <form onSubmit={handleCreateProject} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#d1d5db', marginBottom: '0.5rem' }}>
+            <form onSubmit={handleCreateProject}>
+              <div style={{ marginBottom: '28px' }}>
+                <label 
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: 'var(--color-surface-300)',
+                    marginBottom: '10px',
+                  }}
+                >
                   Project Name
                 </label>
                 <input
@@ -122,42 +449,81 @@ export const Dashboard = () => {
                   value={newProjectTitle}
                   onChange={(e) => setNewProjectTitle(e.target.value)}
                   placeholder="My Awesome Project"
-                  style={{ width: '100%', padding: '0.75rem 1rem', background: '#0f1419', border: '1px solid #1f2937', borderRadius: '0.75rem', color: 'white', fontSize: '1rem' }}
                   autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '14px 16px',
+                    background: 'var(--color-surface-800)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '12px',
+                    color: '#ffffff',
+                    fontSize: '15px',
+                    outline: 'none',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'rgba(59, 130, 246, 0.5)'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.15)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+                    e.target.style.boxShadow = 'none'
+                  }}
                 />
               </div>
               
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  style={{ flex: 1, padding: '0.75rem', background: '#1a1f2e', color: 'white', border: '1px solid #1f2937', borderRadius: '0.75rem', fontWeight: 500, cursor: 'pointer' }}
+                  style={{
+                    flex: 1,
+                    padding: '14px',
+                    background: 'var(--color-surface-700)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '12px',
+                    color: 'var(--color-surface-300)',
+                    fontWeight: 500,
+                    fontSize: '15px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.background = 'var(--color-surface-600)'
+                    e.target.style.color = '#ffffff'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.background = 'var(--color-surface-700)'
+                    e.target.style.color = 'var(--color-surface-300)'
+                  }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  style={{ flex: 1, padding: '0.75rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                  disabled={!newProjectTitle.trim()}
+                  style={{
+                    flex: 1,
+                    padding: '14px',
+                    background: newProjectTitle.trim() 
+                      ? 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%)'
+                      : 'var(--color-surface-700)',
+                    border: 'none',
+                    borderRadius: '12px',
+                    color: newProjectTitle.trim() ? '#ffffff' : 'var(--color-surface-500)',
+                    fontWeight: 600,
+                    fontSize: '15px',
+                    cursor: newProjectTitle.trim() ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.2s ease',
+                  }}
                 >
-                  Create
+                  Create Project
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        input::placeholder {
-          color: #6b7280 !important;
-        }
-        input:focus {
-          outline: none;
-          border-color: #3b82f6 !important;
-        }
-      `}</style>
     </div>
   )
 }

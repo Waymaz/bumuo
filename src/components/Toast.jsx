@@ -1,7 +1,9 @@
 import { CheckCircle, XCircle, Info, AlertTriangle, X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 export const Toast = ({ type = 'success', message, onClose, duration = 3000 }) => {
+  const [closeHover, setCloseHover] = useState(false)
+
   useEffect(() => {
     if (duration) {
       const timer = setTimeout(onClose, duration)
@@ -12,46 +14,79 @@ export const Toast = ({ type = 'success', message, onClose, duration = 3000 }) =
   const config = {
     success: {
       icon: CheckCircle,
-      bgColor: 'from-green-500/20 to-emerald-500/20',
-      borderColor: 'border-green-500/50',
-      iconColor: 'text-green-400',
-      textColor: 'text-green-300'
+      borderColor: 'rgba(52, 211, 153, 0.3)',
+      iconColor: '#34d399',
+      textColor: '#6ee7b7',
     },
     error: {
       icon: XCircle,
-      bgColor: 'from-red-500/20 to-rose-500/20',
-      borderColor: 'border-red-500/50',
-      iconColor: 'text-red-400',
-      textColor: 'text-red-300'
+      borderColor: 'rgba(244, 63, 94, 0.3)',
+      iconColor: '#fb7185',
+      textColor: '#fda4af',
     },
     info: {
       icon: Info,
-      bgColor: 'from-blue-500/20 to-cyan-500/20',
-      borderColor: 'border-blue-500/50',
-      iconColor: 'text-blue-400',
-      textColor: 'text-blue-300'
+      borderColor: 'rgba(59, 130, 246, 0.3)',
+      iconColor: 'var(--color-primary-400)',
+      textColor: '#93c5fd',
     },
     warning: {
       icon: AlertTriangle,
-      bgColor: 'from-yellow-500/20 to-amber-500/20',
-      borderColor: 'border-yellow-500/50',
-      iconColor: 'text-yellow-400',
-      textColor: 'text-yellow-300'
+      borderColor: 'rgba(251, 191, 36, 0.3)',
+      iconColor: '#fbbf24',
+      textColor: '#fcd34d',
     }
   }
 
-  const { icon: Icon, bgColor, borderColor, iconColor, textColor } = config[type]
+  const { icon: Icon, borderColor, iconColor, textColor } = config[type]
+
+  const containerStyle = {
+    position: 'fixed',
+    top: '24px',
+    right: '24px',
+    zIndex: 50,
+    animation: 'fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+  }
+
+  const toastStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    padding: '16px 20px',
+    background: 'rgba(24, 24, 36, 0.95)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    border: `1px solid ${borderColor}`,
+    borderRadius: '16px',
+    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
+    minWidth: '320px',
+  }
+
+  const closeBtnStyle = {
+    color: closeHover ? '#ffffff' : 'var(--color-surface-400)',
+    background: closeHover ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+    border: 'none',
+    padding: '6px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }
 
   return (
-    <div className={`fixed top-6 right-6 z-50 animate-slide-up`}>
-      <div className={`flex items-center gap-3 px-5 py-4 bg-gradient-to-r ${bgColor} backdrop-blur-xl border ${borderColor} rounded-2xl shadow-2xl min-w-[320px]`}>
-        <Icon className={`w-5 h-5 ${iconColor} flex-shrink-0`} />
-        <p className={`flex-1 text-sm font-medium ${textColor}`}>{message}</p>
+    <div style={containerStyle}>
+      <div style={toastStyle}>
+        <Icon style={{ width: '20px', height: '20px', color: iconColor, flexShrink: 0 }} />
+        <p style={{ flex: 1, fontSize: '14px', fontWeight: 500, color: textColor, margin: 0 }}>{message}</p>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-lg"
+          style={closeBtnStyle}
+          onMouseEnter={() => setCloseHover(true)}
+          onMouseLeave={() => setCloseHover(false)}
         >
-          <X className="w-4 h-4" />
+          <X style={{ width: '16px', height: '16px' }} />
         </button>
       </div>
     </div>

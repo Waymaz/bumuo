@@ -1,4 +1,4 @@
-# 🌟 CodeVerse Features Showcase
+# 🌟 BumuO Features Showcase
 
 ## 🎯 Core Features
 

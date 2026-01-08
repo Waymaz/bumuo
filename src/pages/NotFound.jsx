@@ -1,52 +1,193 @@
-import { Home, Search, Code2, Sparkles } from 'lucide-react'
+import { Home, ArrowLeft, Code2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 export const NotFound = () => {
   const navigate = useNavigate()
 
+  const buttonPrimaryStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '14px 24px',
+    background: 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%)',
+    color: '#ffffff',
+    borderRadius: '12px',
+    fontWeight: 600,
+    fontSize: '15px',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 14px rgba(59, 130, 246, 0.25)',
+  }
+
+  const buttonSecondaryStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '14px 24px',
+    background: 'var(--color-surface-850)',
+    color: '#ffffff',
+    borderRadius: '12px',
+    fontWeight: 600,
+    fontSize: '15px',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  }
+
   return (
-    <div className="min-h-screen bg-dark-bg flex items-center justify-center px-4 relative overflow-hidden">
-      {/* Animated background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-blue-500/10 to-pink-500/10"></div>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(139,92,246,0.15),transparent_50%)] animate-pulse"></div>
+    <div 
+      style={{
+        minHeight: '100vh',
+        backgroundColor: 'var(--color-surface-950)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Background decoration */}
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+        <div 
+          style={{
+            position: 'absolute',
+            top: '-160px',
+            right: '-160px',
+            width: '500px',
+            height: '500px',
+            background: 'rgba(59, 130, 246, 0.08)',
+            borderRadius: '50%',
+            filter: 'blur(80px)',
+          }}
+        />
+        <div 
+          style={{
+            position: 'absolute',
+            bottom: '-160px',
+            left: '-160px',
+            width: '500px',
+            height: '500px',
+            background: 'rgba(139, 92, 246, 0.08)',
+            borderRadius: '50%',
+            filter: 'blur(80px)',
+          }}
+        />
+      </div>
       
-      <div className="relative z-10 text-center animate-fade-in max-w-2xl">
-        {/* 404 with glow */}
-        <div className="relative inline-block mb-8">
-          <div className="absolute inset-0 bg-purple-500/30 blur-3xl rounded-full"></div>
-          <h1 className="relative text-9xl font-bold bg-gradient-to-r from-purple-400 via-blue-400 to-pink-400 bg-clip-text text-transparent">
+      <div 
+        style={{
+          textAlign: 'center',
+          maxWidth: '480px',
+          position: 'relative',
+          zIndex: 10,
+          animation: 'fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
+        {/* 404 */}
+        <div style={{ position: 'relative', display: 'inline-block', marginBottom: '32px' }}>
+          <h1 
+            style={{
+              fontSize: 'clamp(100px, 20vw, 140px)',
+              fontWeight: 700,
+              color: 'rgba(30, 30, 46, 0.6)',
+              lineHeight: 1,
+              margin: 0,
+            }}
+          >
             404
           </h1>
-        </div>
-        
-        {/* Icon */}
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <Code2 className="w-12 h-12 text-blue-500" />
-          <Sparkles className="w-8 h-8 text-purple-400 animate-pulse" />
+          <div 
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div 
+              style={{
+                padding: '18px',
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
+                borderRadius: '20px',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+              }}
+            >
+              <Code2 style={{ width: '40px', height: '40px', color: 'var(--color-primary-400)' }} />
+            </div>
+          </div>
         </div>
         
         {/* Message */}
-        <h2 className="text-3xl font-bold text-white mb-4">Page Not Found</h2>
-        <p className="text-gray-400 text-lg mb-12 max-w-md mx-auto">
-          Oops! The page you're looking for seems to have wandered off into the code void.
+        <h2 
+          style={{
+            fontSize: '28px',
+            fontWeight: 700,
+            color: '#ffffff',
+            marginBottom: '12px',
+            letterSpacing: '-0.025em',
+          }}
+        >
+          Page Not Found
+        </h2>
+        <p 
+          style={{
+            color: 'var(--color-surface-400)',
+            fontSize: '16px',
+            marginBottom: '36px',
+            maxWidth: '380px',
+            marginLeft: 'auto',
+            marginRight: 'auto',
+            lineHeight: 1.6,
+          }}
+        >
+          Oops! The page you're looking for doesn't exist or has been moved.
         </p>
         
         {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <div 
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            alignItems: 'center',
+          }}
+        >
           <button
             onClick={() => navigate('/dashboard')}
-            className="group flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-500 hover:via-purple-500 hover:to-pink-500 text-white rounded-2xl font-semibold transition-all duration-500 shadow-glow-md hover:scale-105 active:scale-95 overflow-hidden"
+            style={buttonPrimaryStyle}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-400) 100%)'
+              e.target.style.transform = 'translateY(-2px)'
+              e.target.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.35)'
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%)'
+              e.target.style.transform = 'translateY(0)'
+              e.target.style.boxShadow = '0 4px 14px rgba(59, 130, 246, 0.25)'
+            }}
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-            <Home className="w-5 h-5 relative z-10" />
-            <span className="relative z-10">Go to Dashboard</span>
+            <Home style={{ width: '18px', height: '18px' }} />
+            Go to Dashboard
           </button>
           
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center justify-center gap-2 px-8 py-4 bg-dark-card hover:bg-dark-hover text-white rounded-2xl font-semibold transition-all duration-300 border border-dark-border hover:border-purple-500/50"
+            style={buttonSecondaryStyle}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'var(--color-surface-800)'
+              e.target.style.borderColor = 'rgba(255, 255, 255, 0.12)'
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'var(--color-surface-850)'
+              e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+            }}
           >
-            <Search className="w-5 h-5" />
+            <ArrowLeft style={{ width: '18px', height: '18px' }} />
             Go Back
           </button>
         </div>

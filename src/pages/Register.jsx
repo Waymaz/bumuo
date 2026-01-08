@@ -1,19 +1,48 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Code2, Mail, Lock, ArrowRight } from 'lucide-react'
+import { Code2, Mail, Lock, ArrowRight, Eye, EyeOff, CheckCircle } from 'lucide-react'
 
 export const Register = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { signUp } = useAuth()
   const navigate = useNavigate()
 
+  // Password strength checker
+  const getPasswordStrength = (pass) => {
+    let strength = 0
+    if (pass.length >= 6) strength++
+    if (pass.length >= 8) strength++
+    if (/[A-Z]/.test(pass)) strength++
+    if (/[0-9]/.test(pass)) strength++
+    if (/[^A-Za-z0-9]/.test(pass)) strength++
+    return strength
+  }
+
+  const passwordStrength = getPasswordStrength(password)
+  const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong']
+  const strengthColors = ['#f43f5e', '#f97316', '#f59e0b', '#3b82f6', '#10b981']
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+
     setLoading(true)
 
     const { error } = await signUp(email, password)
@@ -26,105 +55,538 @@ export const Register = () => {
     }
   }
 
+  // Shared input styles
+  const inputBaseStyle = {
+    width: '100%',
+    paddingTop: '13px',
+    paddingBottom: '13px',
+    background: 'var(--color-surface-800)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderRadius: '12px',
+    color: '#ffffff',
+    fontSize: '15px',
+    outline: 'none',
+    transition: 'all 0.2s ease',
+  }
+
+  const handleInputFocus = (e) => {
+    e.target.style.borderColor = 'rgba(59, 130, 246, 0.5)'
+    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.15)'
+  }
+
+  const handleInputBlur = (e) => {
+    e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+    e.target.style.boxShadow = 'none'
+  }
+
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #0f172a, #581c87, #0f172a)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 1rem' }}>
-      <div style={{ width: '100%', maxWidth: '28rem', position: 'relative', zIndex: 10 }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <Code2 style={{ width: '2.5rem', height: '2.5rem', color: '#c084fc' }} />
-            <h1 style={{ fontSize: '1.875rem', fontWeight: 600, color: 'white' }}>CodeVerse</h1>
+    <div 
+      style={{
+        minHeight: '100vh',
+        backgroundColor: 'var(--color-surface-950)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Background decoration */}
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+        <div 
+          style={{
+            position: 'absolute',
+            top: '-160px',
+            right: '-160px',
+            width: '500px',
+            height: '500px',
+            background: 'rgba(59, 130, 246, 0.08)',
+            borderRadius: '50%',
+            filter: 'blur(80px)',
+          }}
+        />
+        <div 
+          style={{
+            position: 'absolute',
+            bottom: '-160px',
+            left: '-160px',
+            width: '500px',
+            height: '500px',
+            background: 'rgba(139, 92, 246, 0.08)',
+            borderRadius: '50%',
+            filter: 'blur(80px)',
+          }}
+        />
+        <div 
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '800px',
+            height: '800px',
+            background: 'rgba(59, 130, 246, 0.03)',
+            borderRadius: '50%',
+            filter: 'blur(100px)',
+          }}
+        />
+      </div>
+      
+      <div 
+        style={{
+          width: '100%',
+          maxWidth: '420px',
+          position: 'relative',
+          zIndex: 10,
+          animation: 'fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
+        {/* Logo Section */}
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <div 
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '14px',
+              marginBottom: '16px',
+            }}
+          >
+            <div 
+              style={{
+                padding: '14px',
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
+                borderRadius: '16px',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+              }}
+            >
+              <Code2 style={{ width: '32px', height: '32px', color: 'var(--color-primary-400)' }} />
+            </div>
+            <h1 
+              style={{
+                fontSize: '32px',
+                fontWeight: 700,
+                color: '#ffffff',
+                letterSpacing: '-0.025em',
+                margin: 0,
+              }}
+            >
+              BumuO
+            </h1>
           </div>
-          <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Create your account</p>
+          <p 
+            style={{
+              color: 'var(--color-surface-400)',
+              fontSize: '15px',
+              margin: 0,
+              fontWeight: 400,
+            }}
+          >
+            Create your account and start coding
+          </p>
         </div>
 
         {/* Form Card */}
-        <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '1rem', padding: '2rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div 
+          style={{
+            background: 'rgba(18, 18, 28, 0.85)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '20px',
+            padding: '32px',
+            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5), 0 12px 24px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          <form onSubmit={handleSubmit}>
+            {/* Error Alert */}
             {error && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.5)', color: '#fecaca', padding: '0.75rem 1rem', borderRadius: '0.75rem', fontSize: '0.875rem' }}>
+              <div 
+                style={{
+                  background: 'rgba(244, 63, 94, 0.1)',
+                  border: '1px solid rgba(244, 63, 94, 0.25)',
+                  color: '#fda4af',
+                  padding: '14px 16px',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  marginBottom: '24px',
+                  animation: 'fade-in 0.3s ease',
+                }}
+              >
+                <div 
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    background: '#fb7185',
+                    borderRadius: '50%',
+                    marginTop: '6px',
+                    flexShrink: 0,
+                  }}
+                />
                 {error}
               </div>
             )}
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'white', marginBottom: '0.5rem' }}>
-                Email
+            {/* Email Field */}
+            <div style={{ marginBottom: '20px' }}>
+              <label 
+                style={{
+                  display: 'block',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: 'var(--color-surface-300)',
+                  marginBottom: '8px',
+                  letterSpacing: '0.01em',
+                }}
+              >
+                Email Address
               </label>
               <div style={{ position: 'relative' }}>
-                <Mail style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1.25rem', height: '1.25rem', color: '#94a3b8' }} />
+                <Mail 
+                  style={{
+                    position: 'absolute',
+                    left: '14px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '18px',
+                    height: '18px',
+                    color: 'var(--color-surface-500)',
+                  }}
+                />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  style={{ width: '100%', paddingLeft: '2.75rem', paddingRight: '1rem', paddingTop: '0.75rem', paddingBottom: '0.75rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '0.75rem', color: 'white', fontSize: '1rem' }}
                   required
+                  style={{
+                    ...inputBaseStyle,
+                    paddingLeft: '44px',
+                    paddingRight: '16px',
+                  }}
+                  onFocus={handleInputFocus}
+                  onBlur={handleInputBlur}
                 />
               </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'white', marginBottom: '0.5rem' }}>
+            {/* Password Field */}
+            <div style={{ marginBottom: '20px' }}>
+              <label 
+                style={{
+                  display: 'block',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: 'var(--color-surface-300)',
+                  marginBottom: '8px',
+                  letterSpacing: '0.01em',
+                }}
+              >
                 Password
               </label>
               <div style={{ position: 'relative' }}>
-                <Lock style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1.25rem', height: '1.25rem', color: '#94a3b8' }} />
+                <Lock 
+                  style={{
+                    position: 'absolute',
+                    left: '14px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '18px',
+                    height: '18px',
+                    color: 'var(--color-surface-500)',
+                  }}
+                />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  style={{ width: '100%', paddingLeft: '2.75rem', paddingRight: '1rem', paddingTop: '0.75rem', paddingBottom: '0.75rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '0.75rem', color: 'white', fontSize: '1rem' }}
+                  placeholder="Create a strong password"
                   required
                   minLength={6}
+                  style={{
+                    ...inputBaseStyle,
+                    paddingLeft: '44px',
+                    paddingRight: '48px',
+                  }}
+                  onFocus={handleInputFocus}
+                  onBlur={handleInputBlur}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  style={{
+                    position: 'absolute',
+                    right: '14px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    padding: '4px',
+                    cursor: 'pointer',
+                    color: 'var(--color-surface-500)',
+                    transition: 'color 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-surface-500)'}
+                >
+                  {showPassword ? (
+                    <EyeOff style={{ width: '18px', height: '18px' }} />
+                  ) : (
+                    <Eye style={{ width: '18px', height: '18px' }} />
+                  )}
+                </button>
               </div>
-              <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#94a3b8' }}>Minimum 6 characters</p>
+              
+              {/* Password strength indicator */}
+              {password && (
+                <div style={{ marginTop: '12px' }}>
+                  <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          height: '4px',
+                          flex: 1,
+                          borderRadius: '9999px',
+                          transition: 'all 0.2s ease',
+                          backgroundColor: i < passwordStrength 
+                            ? strengthColors[passwordStrength - 1] 
+                            : 'var(--color-surface-700)',
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <p style={{ fontSize: '12px', color: 'var(--color-surface-400)', margin: 0 }}>
+                    Password strength:{' '}
+                    <span 
+                      style={{ 
+                        fontWeight: 500, 
+                        color: strengthColors[passwordStrength - 1] || 'var(--color-orange-400)',
+                      }}
+                    >
+                      {strengthLabels[passwordStrength - 1] || 'Too weak'}
+                    </span>
+                  </p>
+                </div>
+              )}
             </div>
 
+            {/* Confirm Password Field */}
+            <div style={{ marginBottom: '28px' }}>
+              <label 
+                style={{
+                  display: 'block',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: 'var(--color-surface-300)',
+                  marginBottom: '8px',
+                  letterSpacing: '0.01em',
+                }}
+              >
+                Confirm Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Lock 
+                  style={{
+                    position: 'absolute',
+                    left: '14px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '18px',
+                    height: '18px',
+                    color: 'var(--color-surface-500)',
+                  }}
+                />
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm your password"
+                  required
+                  style={{
+                    ...inputBaseStyle,
+                    paddingLeft: '44px',
+                    paddingRight: '48px',
+                    borderColor: confirmPassword && confirmPassword === password 
+                      ? 'rgba(16, 185, 129, 0.5)'
+                      : confirmPassword && confirmPassword !== password
+                      ? 'rgba(244, 63, 94, 0.5)'
+                      : 'rgba(255, 255, 255, 0.08)',
+                  }}
+                  onFocus={(e) => {
+                    if (confirmPassword && confirmPassword === password) {
+                      e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.15)'
+                    } else if (confirmPassword && confirmPassword !== password) {
+                      e.target.style.boxShadow = '0 0 0 3px rgba(244, 63, 94, 0.15)'
+                    } else {
+                      handleInputFocus(e)
+                    }
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.boxShadow = 'none'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  style={{
+                    position: 'absolute',
+                    right: '14px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    padding: '4px',
+                    cursor: 'pointer',
+                    color: 'var(--color-surface-500)',
+                    transition: 'color 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-surface-500)'}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff style={{ width: '18px', height: '18px' }} />
+                  ) : (
+                    <Eye style={{ width: '18px', height: '18px' }} />
+                  )}
+                </button>
+              </div>
+              {confirmPassword && (
+                <p 
+                  style={{
+                    marginTop: '8px',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: confirmPassword === password ? '#34d399' : '#fb7185',
+                  }}
+                >
+                  {confirmPassword === password ? (
+                    <>
+                      <CheckCircle style={{ width: '14px', height: '14px' }} />
+                      Passwords match
+                    </>
+                  ) : (
+                    'Passwords do not match'
+                  )}
+                </p>
+              )}
+            </div>
+
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              style={{ width: '100%', padding: '0.75rem', background: loading ? 'rgba(168, 85, 247, 0.5)' : '#a855f7', color: 'white', fontWeight: 500, borderRadius: '0.75rem', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', boxShadow: '0 10px 15px -3px rgba(168, 85, 247, 0.25)', transition: 'all 0.2s' }}
+              style={{
+                width: '100%',
+                padding: '14px 24px',
+                background: loading 
+                  ? 'var(--color-surface-700)' 
+                  : 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%)',
+                border: 'none',
+                borderRadius: '12px',
+                color: '#ffffff',
+                fontSize: '15px',
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.3s ease',
+                boxShadow: loading ? 'none' : '0 4px 14px rgba(59, 130, 246, 0.25)',
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.target.style.background = 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-400) 100%)'
+                  e.target.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.35)'
+                  e.target.style.transform = 'translateY(-1px)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) {
+                  e.target.style.background = 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%)'
+                  e.target.style.boxShadow = '0 4px 14px rgba(59, 130, 246, 0.25)'
+                  e.target.style.transform = 'translateY(0)'
+                }
+              }}
+              onMouseDown={(e) => {
+                if (!loading) {
+                  e.target.style.transform = 'scale(0.98)'
+                }
+              }}
+              onMouseUp={(e) => {
+                if (!loading) {
+                  e.target.style.transform = 'translateY(-1px)'
+                }
+              }}
             >
               {loading ? (
-                <div style={{ width: '1.25rem', height: '1.25rem', border: '2px solid rgba(255, 255, 255, 0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                <div 
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderTopColor: '#ffffff',
+                    borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite',
+                  }}
+                />
               ) : (
                 <>
                   Create Account
-                  <ArrowRight style={{ width: '1rem', height: '1rem' }} />
+                  <ArrowRight style={{ width: '16px', height: '16px' }} />
                 </>
               )}
             </button>
           </form>
 
-          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
-            <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+          {/* Divider and Sign In Link */}
+          <div style={{ marginTop: '28px', textAlign: 'center' }}>
+            <p 
+              style={{
+                color: 'var(--color-surface-400)',
+                fontSize: '14px',
+                margin: 0,
+              }}
+            >
               Already have an account?{' '}
-              <Link to="/login" style={{ color: '#c084fc', fontWeight: 500, textDecoration: 'none' }}>
+              <Link 
+                to="/login" 
+                style={{
+                  color: 'var(--color-primary-400)',
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  transition: 'color 0.2s ease',
+                }}
+                onMouseEnter={(e) => e.target.style.color = 'var(--color-primary-300)'}
+                onMouseLeave={(e) => e.target.style.color = 'var(--color-primary-400)'}
+              >
                 Sign in
               </Link>
             </p>
           </div>
         </div>
+
+        {/* Footer Text */}
+        <p 
+          style={{
+            textAlign: 'center',
+            marginTop: '32px',
+            color: 'var(--color-surface-500)',
+            fontSize: '13px',
+          }}
+        >
+          By creating an account, you agree to our Terms of Service
+        </p>
       </div>
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        input::placeholder {
-          color: #64748b !important;
-        }
-        input:focus {
-          outline: none;
-          border-color: #c084fc !important;
-          background: rgba(255, 255, 255, 0.1) !important;
-        }
-        button:hover:not(:disabled) {
-          background: #9333ea !important;
-        }
-      `}</style>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-# 🎨 CodeVerse UI Component Library - Quick Reference
+# 🎨 BumuO UI Component Library - Quick Reference
 
 ## Utility Classes
 
@@ -369,4 +369,4 @@
 </div>
 ```
 
-This quick reference covers the most commonly used patterns in the CodeVerse premium UI!
+This quick reference covers the most commonly used patterns in the BumuO premium UI!

@@ -1,4 +1,4 @@
-# 🔧 CodeVerse Troubleshooting Guide
+# 🔧 BumuO Troubleshooting Guide
 
 ## Common Issues & Solutions
 
