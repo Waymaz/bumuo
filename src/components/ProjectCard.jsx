@@ -1,6 +1,7 @@
-import { Trash2, ExternalLink, Clock, Code, MoreVertical } from 'lucide-react'
+import { Trash2, ExternalLink, Clock, Code, MoreVertical, Play } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
+import { ProjectPreview } from './ProjectPreview'
 
 export const ProjectCard = ({ project, onDelete, viewMode = 'grid' }) => {
   const navigate = useNavigate()
@@ -30,7 +31,7 @@ export const ProjectCard = ({ project, onDelete, viewMode = 'grid' }) => {
       background: 'var(--color-surface-850)',
       border: hovered ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)',
       borderRadius: '16px',
-      padding: '16px',
+      padding: '12px',
       cursor: 'pointer',
       transition: 'all 0.3s ease',
       display: 'flex',
@@ -71,18 +72,69 @@ export const ProjectCard = ({ project, onDelete, viewMode = 'grid' }) => {
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
+        {/* Mini Preview Thumbnail */}
         <div 
           style={{
-            padding: '12px',
-            background: hovered 
-              ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(139, 92, 246, 0.3) 100%)'
-              : 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
-            borderRadius: '14px',
-            border: '1px solid rgba(59, 130, 246, 0.1)',
-            transition: 'all 0.3s ease',
+            width: '80px',
+            height: '50px',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            flexShrink: 0,
+            background: '#ffffff',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            position: 'relative',
           }}
         >
-          <Code style={{ width: '20px', height: '20px', color: 'var(--color-primary-400)' }} />
+          {(project.html?.trim() || project.css?.trim() || project.js?.trim()) ? (
+            <div
+              style={{
+                width: '400%',
+                height: '400%',
+                transform: 'scale(0.25)',
+                transformOrigin: 'top left',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+              }}
+            >
+              <iframe
+                title="list-preview"
+                srcDoc={`
+                  <!DOCTYPE html>
+                  <html>
+                    <head>
+                      <style>
+                        * { box-sizing: border-box; pointer-events: none !important; }
+                        body { margin: 0; padding: 8px; font-family: system-ui, sans-serif; background: #fff; overflow: hidden; }
+                        ${project.css || ''}
+                      </style>
+                    </head>
+                    <body>${project.html || ''}</body>
+                  </html>
+                `}
+                sandbox=""
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  display: 'block',
+                }}
+              />
+            </div>
+          ) : (
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'var(--color-surface-800)',
+              }}
+            >
+              <Code style={{ width: '16px', height: '16px', color: 'var(--color-surface-600)' }} />
+            </div>
+          )}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h3 
@@ -135,10 +187,10 @@ export const ProjectCard = ({ project, onDelete, viewMode = 'grid' }) => {
     background: 'var(--color-surface-850)',
     border: hovered ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)',
     borderRadius: '20px',
-    padding: '24px',
+    overflow: 'hidden',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
-    boxShadow: hovered ? '0 20px 40px rgba(59, 130, 246, 0.1)' : 'none',
+    boxShadow: hovered ? '0 20px 40px rgba(59, 130, 246, 0.12)' : '0 4px 12px rgba(0, 0, 0, 0.1)',
     transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
   }
 
@@ -195,115 +247,154 @@ export const ProjectCard = ({ project, onDelete, viewMode = 'grid' }) => {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); setShowMenu(false) }}
     >
-      {/* Menu Button */}
-      <div style={{ position: 'absolute', top: '16px', right: '16px' }}>
+      {/* Preview Section */}
+      <div style={{ padding: '12px 12px 0 12px' }}>
+        <ProjectPreview 
+          html={project.html} 
+          css={project.css} 
+          js={project.js}
+          isHovered={hovered}
+        />
+      </div>
+
+      {/* Content Section */}
+      <div style={{ padding: '16px 20px 20px 20px' }}>
+        {/* Header with title and menu */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
+            <h3 
+              style={{
+                fontWeight: 600,
+                color: hovered ? 'var(--color-primary-400)' : '#ffffff',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                transition: 'color 0.2s ease',
+                fontSize: '17px',
+                marginBottom: '6px',
+                lineHeight: 1.3,
+              }}
+            >
+              {project.title}
+            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-surface-400)' }}>
+              <Clock style={{ width: '13px', height: '13px' }} />
+              <span>{formatDate(project.updated_at)}</span>
+            </div>
+          </div>
+          
+          {/* Menu Button */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowMenu(!showMenu)
+              }}
+              style={{
+                ...menuBtnStyle,
+                opacity: hovered ? 1 : 0,
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.color = '#ffffff'
+                e.target.style.background = 'var(--color-surface-700)'
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.color = 'var(--color-surface-500)'
+                e.target.style.background = 'transparent'
+              }}
+            >
+              <MoreVertical style={{ width: '16px', height: '16px' }} />
+            </button>
+            {showMenu && (
+              <div style={dropdownStyle} onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={handleDelete}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    textAlign: 'left',
+                    fontSize: '14px',
+                    color: '#fb7185',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    transition: 'background 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => e.target.style.background = 'rgba(244, 63, 94, 0.1)'}
+                  onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                >
+                  <Trash2 style={{ width: '16px', height: '16px' }} />
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Code language indicators */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          <div 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              padding: '4px 10px',
+              background: project.html?.trim() ? 'rgba(251, 146, 60, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '6px',
+              border: project.html?.trim() ? '1px solid rgba(251, 146, 60, 0.2)' : '1px solid rgba(255, 255, 255, 0.04)',
+            }}
+          >
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: project.html?.trim() ? '#fb923c' : 'var(--color-surface-600)' }} />
+            <span style={{ fontSize: '11px', fontWeight: 500, color: project.html?.trim() ? '#fb923c' : 'var(--color-surface-500)' }}>HTML</span>
+          </div>
+          <div 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              padding: '4px 10px',
+              background: project.css?.trim() ? 'rgba(34, 211, 238, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '6px',
+              border: project.css?.trim() ? '1px solid rgba(34, 211, 238, 0.2)' : '1px solid rgba(255, 255, 255, 0.04)',
+            }}
+          >
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: project.css?.trim() ? '#22d3ee' : 'var(--color-surface-600)' }} />
+            <span style={{ fontSize: '11px', fontWeight: 500, color: project.css?.trim() ? '#22d3ee' : 'var(--color-surface-500)' }}>CSS</span>
+          </div>
+          <div 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              padding: '4px 10px',
+              background: project.js?.trim() ? 'rgba(250, 204, 21, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '6px',
+              border: project.js?.trim() ? '1px solid rgba(250, 204, 21, 0.2)' : '1px solid rgba(255, 255, 255, 0.04)',
+            }}
+          >
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: project.js?.trim() ? '#facc15' : 'var(--color-surface-600)' }} />
+            <span style={{ fontSize: '11px', fontWeight: 500, color: project.js?.trim() ? '#facc15' : 'var(--color-surface-500)' }}>JS</span>
+          </div>
+        </div>
+        
+        {/* Open button */}
         <button
           onClick={(e) => {
             e.stopPropagation()
-            setShowMenu(!showMenu)
+            navigate(`/editor/${project.id}`)
           }}
-          style={menuBtnStyle}
-          onMouseEnter={(e) => {
-            e.target.style.color = '#ffffff'
-            e.target.style.background = 'var(--color-surface-700)'
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.color = 'var(--color-surface-500)'
-            e.target.style.background = 'transparent'
-          }}
+          style={mainBtnStyle}
+          onMouseEnter={() => setOpenBtnHover(true)}
+          onMouseLeave={() => setOpenBtnHover(false)}
         >
-          <MoreVertical style={{ width: '16px', height: '16px' }} />
+          <Play style={{ width: '15px', height: '15px' }} />
+          Open Editor
         </button>
-        {showMenu && (
-          <div style={dropdownStyle} onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={handleDelete}
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                textAlign: 'left',
-                fontSize: '14px',
-                color: '#fb7185',
-                background: 'transparent',
-                border: 'none',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                transition: 'background 0.2s ease',
-              }}
-              onMouseEnter={(e) => e.target.style.background = 'rgba(244, 63, 94, 0.1)'}
-              onMouseLeave={(e) => e.target.style.background = 'transparent'}
-            >
-              <Trash2 style={{ width: '16px', height: '16px' }} />
-              Delete
-            </button>
-          </div>
-        )}
       </div>
-
-      <div style={{ marginBottom: '20px' }}>
-        <div 
-          style={{
-            padding: '14px',
-            background: hovered 
-              ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(139, 92, 246, 0.3) 100%)'
-              : 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
-            borderRadius: '16px',
-            display: 'inline-block',
-            marginBottom: '14px',
-            border: '1px solid rgba(59, 130, 246, 0.1)',
-            transition: 'all 0.3s ease',
-          }}
-        >
-          <Code style={{ width: '24px', height: '24px', color: 'var(--color-primary-400)' }} />
-        </div>
-        <h3 
-          style={{
-            fontWeight: 600,
-            color: hovered ? 'var(--color-primary-400)' : '#ffffff',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            transition: 'color 0.2s ease',
-            fontSize: '18px',
-            marginBottom: '6px',
-          }}
-        >
-          {project.title}
-        </h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: 'var(--color-surface-400)' }}>
-          <Clock style={{ width: '14px', height: '14px' }} />
-          <span>{formatDate(project.updated_at)}</span>
-        </div>
-      </div>
-      
-      {/* Code preview indicator */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-        <div style={{ height: '4px', flex: 1, background: 'rgba(251, 146, 60, 0.2)', borderRadius: '100px', overflow: 'hidden' }}>
-          <div style={{ height: '100%', background: '#fb923c', borderRadius: '100px', width: '75%' }} />
-        </div>
-        <div style={{ height: '4px', flex: 1, background: 'rgba(34, 211, 238, 0.2)', borderRadius: '100px', overflow: 'hidden' }}>
-          <div style={{ height: '100%', background: '#22d3ee', borderRadius: '100px', width: '50%' }} />
-        </div>
-        <div style={{ height: '4px', flex: 1, background: 'rgba(250, 204, 21, 0.2)', borderRadius: '100px', overflow: 'hidden' }}>
-          <div style={{ height: '100%', background: '#facc15', borderRadius: '100px', width: '66%' }} />
-        </div>
-      </div>
-      
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          navigate(`/editor/${project.id}`)
-        }}
-        style={mainBtnStyle}
-        onMouseEnter={() => setOpenBtnHover(true)}
-        onMouseLeave={() => setOpenBtnHover(false)}
-      >
-        <ExternalLink style={{ width: '16px', height: '16px' }} />
-        Open Project
-      </button>
     </div>
   )
 }
