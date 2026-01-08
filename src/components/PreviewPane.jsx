@@ -1,17 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 
 export const PreviewPane = ({ html, css, js }) => {
-  const iframeRef = useRef(null)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    const iframe = iframeRef.current
-    if (!iframe) return
-
-    setError(null)
-
-    const document = iframe.contentDocument
-    const documentContents = `
+  // Generate the srcDoc content - more reliable than document.write()
+  const srcDoc = useMemo(() => {
+    return `
       <!DOCTYPE html>
       <html>
         <head>
@@ -26,36 +20,32 @@ export const PreviewPane = ({ html, css, js }) => {
               padding: 16px;
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             }
-            ${css}
+            ${css || ''}
           </style>
         </head>
         <body>
-          ${html}
+          ${html || ''}
           <script>
             window.onerror = function(message, source, lineno, colno, error) {
-              window.parent.postMessage({ type: 'error', message: message }, '*');
+              window.parent.postMessage({ type: 'preview-error', message: message }, '*');
               return true;
             };
             try {
-              ${js}
+              ${js || ''}
             } catch (error) {
-              window.parent.postMessage({ type: 'error', message: error.message }, '*');
+              window.parent.postMessage({ type: 'preview-error', message: error.message }, '*');
               console.error('JavaScript Error:', error);
             }
           </script>
         </body>
       </html>
     `
-
-    document.open()
-    document.write(documentContents)
-    document.close()
   }, [html, css, js])
 
   // Listen for errors from iframe
   useEffect(() => {
     const handleMessage = (event) => {
-      if (event.data?.type === 'error') {
+      if (event.data?.type === 'preview-error') {
         setError(event.data.message)
       }
     }
@@ -63,19 +53,24 @@ export const PreviewPane = ({ html, css, js }) => {
     return () => window.removeEventListener('message', handleMessage)
   }, [])
 
+  // Clear errors when code changes
+  useEffect(() => {
+    setError(null)
+  }, [html, css, js])
+
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="relative w-full h-full bg-white">
       {error && (
-        <div className="px-4 py-2 bg-red-50 border-b border-red-200 text-red-600 text-sm font-mono flex items-center gap-2">
+        <div className="absolute top-0 left-0 right-0 z-10 px-4 py-2 bg-red-50 border-b border-red-200 text-red-600 text-sm font-mono flex items-center gap-2">
           <span className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></span>
           <span className="truncate">Error: {error}</span>
         </div>
       )}
       <iframe
-        ref={iframeRef}
         title="preview"
+        srcDoc={srcDoc}
         sandbox="allow-scripts allow-modals"
-        className="w-full flex-1 bg-white border-0"
+        className="absolute inset-0 w-full h-full bg-white border-0"
       />
     </div>
   )

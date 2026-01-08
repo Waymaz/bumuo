@@ -1,15 +1,84 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
   Save, Share2, ArrowLeft, Play, Sparkles, Code, Palette, Zap,
   PanelLeft, PanelRight, PanelBottom, EyeOff, Eye, Maximize2, Minimize2,
-  RefreshCw, Settings, ChevronDown, Monitor, Tablet, Smartphone
+  RefreshCw, Settings, ChevronDown, Monitor, Tablet, Smartphone, GripVertical
 } from 'lucide-react'
 import { Navbar } from '../components/Navbar'
 import { CodeEditor } from '../components/CodeEditor'
 import { PreviewPane } from '../components/PreviewPane'
+import { PreviewErrorBoundary } from '../components/ErrorBoundary'
 import { projectService } from '../services/projectService'
 import { useAuth } from '../context/AuthContext'
+
+// Custom hook for resizable panels
+const useResizable = (initialSizes, direction = 'vertical') => {
+  const [sizes, setSizes] = useState(initialSizes)
+  const containerRef = useRef(null)
+  const draggingIndex = useRef(null)
+  const startPos = useRef(0)
+  const startSizes = useRef([])
+
+  const handleMouseDown = useCallback((index, e) => {
+    e.preventDefault()
+    draggingIndex.current = index
+    startPos.current = direction === 'vertical' ? e.clientY : e.clientX
+    startSizes.current = [...sizes]
+    document.body.style.cursor = direction === 'vertical' ? 'row-resize' : 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [sizes, direction])
+
+  const handleMouseMove = useCallback((e) => {
+    if (draggingIndex.current === null || !containerRef.current) return
+
+    const container = containerRef.current
+    const containerSize = direction === 'vertical' 
+      ? container.offsetHeight 
+      : container.offsetWidth
+    const currentPos = direction === 'vertical' ? e.clientY : e.clientX
+    const delta = currentPos - startPos.current
+    const deltaPercent = (delta / containerSize) * 100
+
+    const newSizes = [...startSizes.current]
+    const idx = draggingIndex.current
+
+    // Ensure minimum size of 10%
+    const minSize = 10
+    let newSize1 = startSizes.current[idx] + deltaPercent
+    let newSize2 = startSizes.current[idx + 1] - deltaPercent
+
+    if (newSize1 < minSize) {
+      newSize1 = minSize
+      newSize2 = startSizes.current[idx] + startSizes.current[idx + 1] - minSize
+    }
+    if (newSize2 < minSize) {
+      newSize2 = minSize
+      newSize1 = startSizes.current[idx] + startSizes.current[idx + 1] - minSize
+    }
+
+    newSizes[idx] = newSize1
+    newSizes[idx + 1] = newSize2
+    setSizes(newSizes)
+  }, [direction])
+
+  const handleMouseUp = useCallback(() => {
+    draggingIndex.current = null
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }, [])
+
+  useEffect(() => {
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [handleMouseMove, handleMouseUp])
+
+  return { sizes, setSizes, containerRef, handleMouseDown }
+}
 
 export const Editor = () => {
   const { id } = useParams()
@@ -32,6 +101,67 @@ export const Editor = () => {
   const [previewDevice, setPreviewDevice] = useState('desktop') // 'desktop', 'tablet', 'mobile'
   const [showLayoutMenu, setShowLayoutMenu] = useState(false)
   const [showDeviceMenu, setShowDeviceMenu] = useState(false)
+
+  // Resizable panels - vertical (for side layout) and horizontal (for bottom layout)
+  const verticalResize = useResizable([33.33, 33.33, 33.34], 'vertical')
+  const horizontalResize = useResizable([33.33, 33.33, 33.34], 'horizontal')
+  
+  // Main panel split (editors vs preview)
+  const [editorPanelSize, setEditorPanelSize] = useState(50) // percentage
+  const [isCodePanelHidden, setIsCodePanelHidden] = useState(false)
+  const mainSplitRef = useRef(null)
+  const mainDragging = useRef(false)
+  const mainStartPos = useRef(0)
+  const mainStartSize = useRef(50)
+
+  // Main panel resize handlers
+  const handleMainSplitMouseDown = useCallback((e) => {
+    e.preventDefault()
+    mainDragging.current = true
+    mainStartPos.current = previewPosition === 'bottom' ? e.clientY : e.clientX
+    mainStartSize.current = editorPanelSize
+    document.body.style.cursor = previewPosition === 'bottom' ? 'row-resize' : 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [editorPanelSize, previewPosition])
+
+  useEffect(() => {
+    const handleMainMouseMove = (e) => {
+      if (!mainDragging.current || !mainSplitRef.current) return
+      
+      const container = mainSplitRef.current.parentElement
+      const containerSize = previewPosition === 'bottom' 
+        ? container.offsetHeight 
+        : container.offsetWidth
+      const currentPos = previewPosition === 'bottom' ? e.clientY : e.clientX
+      const containerRect = container.getBoundingClientRect()
+      const startOffset = previewPosition === 'bottom' ? containerRect.top : containerRect.left
+      
+      // Calculate new size based on position within container
+      let newSize = ((currentPos - startOffset) / containerSize) * 100
+      
+      // For left preview, invert the calculation
+      if (previewPosition === 'left') {
+        newSize = 100 - newSize
+      }
+      
+      // Clamp between 20% and 80%
+      newSize = Math.max(20, Math.min(80, newSize))
+      setEditorPanelSize(newSize)
+    }
+
+    const handleMainMouseUp = () => {
+      mainDragging.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    document.addEventListener('mousemove', handleMainMouseMove)
+    document.addEventListener('mouseup', handleMainMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMainMouseMove)
+      document.removeEventListener('mouseup', handleMainMouseUp)
+    }
+  }, [previewPosition])
 
   useEffect(() => {
     loadProject()
@@ -112,16 +242,6 @@ export const Editor = () => {
     }
   }
 
-  const getLayoutClasses = () => {
-    if (previewPosition === 'hidden') {
-      return 'grid-cols-1'
-    }
-    if (previewPosition === 'bottom') {
-      return 'grid-cols-1 grid-rows-2'
-    }
-    return 'grid-cols-1 lg:grid-cols-2'
-  }
-
   const getDeviceWidth = () => {
     switch (previewDevice) {
       case 'mobile': return '375px'
@@ -132,103 +252,246 @@ export const Editor = () => {
 
   if (!project) {
     return (
-      <div className="min-h-screen bg-surface-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative inline-block">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-surface-700 border-t-primary-500"></div>
+      <div 
+        style={{
+          minHeight: '100vh',
+          backgroundColor: 'var(--color-surface-950)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <div 
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                border: '4px solid var(--color-surface-700)',
+                borderTopColor: 'var(--color-primary-500)',
+                animation: 'spin 1s linear infinite',
+              }}
+            />
           </div>
-          <p className="mt-6 text-surface-400 font-medium">Loading your project...</p>
+          <p style={{ marginTop: '24px', color: 'var(--color-surface-400)', fontWeight: 500 }}>
+            Loading your project...
+          </p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className={`h-screen flex flex-col bg-surface-950 ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
+    <div 
+      style={{
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: 'var(--color-surface-950)',
+        ...(isFullscreen ? { position: 'fixed', inset: 0, zIndex: 50 } : {}),
+      }}
+    >
       {!isFullscreen && <Navbar />}
       
       {/* Enhanced Toolbar */}
-      <div className="bg-surface-900 border-b border-white/[0.06] px-4 md:px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2 md:gap-4">
+      <div 
+        style={{
+          background: 'rgba(15, 15, 23, 0.95)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <button
             onClick={() => navigate('/dashboard')}
-            className="p-2 text-surface-400 hover:text-white hover:bg-surface-700 rounded-xl transition-all duration-200 group"
+            style={{
+              padding: '10px',
+              color: 'var(--color-surface-400)',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#ffffff'
+              e.currentTarget.style.background = 'var(--color-surface-700)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-surface-400)'
+              e.currentTarget.style.background = 'transparent'
+            }}
             title="Back to Dashboard"
           >
-            <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-0.5" />
+            <ArrowLeft style={{ width: '20px', height: '20px' }} />
           </button>
           
-          <div className="hidden sm:block h-6 w-px bg-white/[0.06]"></div>
+          <div style={{ height: '24px', width: '1px', background: 'rgba(255, 255, 255, 0.06)' }} className="hidden-mobile" />
           
-          <div className="relative flex-1 max-w-xs md:max-w-md">
+          <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-surface-800 border border-white/[0.08] rounded-xl px-4 py-2 text-white font-medium focus:outline-none focus:border-primary-500/50 focus:ring-2 focus:ring-primary-500/20 transition-all text-sm md:text-base placeholder-surface-500"
+              style={{
+                width: '100%',
+                background: 'var(--color-surface-800)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '12px',
+                padding: '10px 40px 10px 16px',
+                color: '#ffffff',
+                fontWeight: 500,
+                fontSize: '15px',
+                outline: 'none',
+                transition: 'all 0.2s ease',
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = 'rgba(59, 130, 246, 0.5)'
+                e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+                e.target.style.boxShadow = 'none'
+              }}
               placeholder="Project name..."
             />
-            <Sparkles className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-400/50" />
+            <Sparkles style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px', color: 'rgba(59, 130, 246, 0.5)' }} />
           </div>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-3">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {/* Layout Controls - Desktop */}
-          <div className="hidden lg:flex items-center gap-1 p-1 bg-surface-800 rounded-xl border border-white/[0.06]">
-            <button
-              onClick={() => setPreviewPosition('left')}
-              className={`p-2 rounded-lg transition-all duration-200 ${previewPosition === 'left' ? 'bg-primary-500/20 text-primary-400' : 'text-surface-400 hover:text-white hover:bg-surface-700'}`}
-              title="Preview Left"
-            >
-              <PanelLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setPreviewPosition('right')}
-              className={`p-2 rounded-lg transition-all duration-200 ${previewPosition === 'right' ? 'bg-primary-500/20 text-primary-400' : 'text-surface-400 hover:text-white hover:bg-surface-700'}`}
-              title="Preview Right"
-            >
-              <PanelRight className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setPreviewPosition('bottom')}
-              className={`p-2 rounded-lg transition-all duration-200 ${previewPosition === 'bottom' ? 'bg-primary-500/20 text-primary-400' : 'text-surface-400 hover:text-white hover:bg-surface-700'}`}
-              title="Preview Bottom"
-            >
-              <PanelBottom className="w-4 h-4" />
-            </button>
+          <div 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px',
+              background: 'var(--color-surface-800)',
+              borderRadius: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+            }}
+            className="hidden-mobile"
+          >
+            {[
+              { pos: 'left', icon: PanelLeft, title: 'Preview Left' },
+              { pos: 'right', icon: PanelRight, title: 'Preview Right' },
+              { pos: 'bottom', icon: PanelBottom, title: 'Preview Bottom' },
+            ].map(({ pos, icon: Icon, title }) => (
+              <button
+                key={pos}
+                onClick={() => setPreviewPosition(pos)}
+                style={{
+                  padding: '8px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  background: previewPosition === pos ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                  color: previewPosition === pos ? 'var(--color-primary-400)' : 'var(--color-surface-400)',
+                }}
+                title={title}
+              >
+                <Icon style={{ width: '16px', height: '16px' }} />
+              </button>
+            ))}
             <button
               onClick={() => setPreviewPosition(previewPosition === 'hidden' ? 'right' : 'hidden')}
-              className={`p-2 rounded-lg transition-all duration-200 ${previewPosition === 'hidden' ? 'bg-primary-500/20 text-primary-400' : 'text-surface-400 hover:text-white hover:bg-surface-700'}`}
+              style={{
+                padding: '8px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                background: previewPosition === 'hidden' ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                color: previewPosition === 'hidden' ? 'var(--color-primary-400)' : 'var(--color-surface-400)',
+              }}
               title={previewPosition === 'hidden' ? 'Show Preview' : 'Hide Preview'}
             >
-              {previewPosition === 'hidden' ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              {previewPosition === 'hidden' ? <Eye style={{ width: '16px', height: '16px' }} /> : <EyeOff style={{ width: '16px', height: '16px' }} />}
+            </button>
+            <div style={{ width: '1px', height: '16px', background: 'rgba(255, 255, 255, 0.1)' }} />
+            <button
+              onClick={() => setIsCodePanelHidden(!isCodePanelHidden)}
+              style={{
+                padding: '8px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                background: isCodePanelHidden ? 'rgba(251, 191, 36, 0.2)' : 'transparent',
+                color: isCodePanelHidden ? '#fbbf24' : 'var(--color-surface-400)',
+              }}
+              title={isCodePanelHidden ? 'Show Code Editors' : 'Hide Code Editors'}
+            >
+              <Code style={{ width: '16px', height: '16px' }} />
             </button>
           </div>
 
           {/* Layout Menu - Mobile/Tablet */}
-          <div className="relative lg:hidden">
+          <div style={{ position: 'relative' }} className="visible-mobile">
             <button
               onClick={(e) => { e.stopPropagation(); setShowLayoutMenu(!showLayoutMenu) }}
-              className="p-2 text-surface-400 hover:text-white hover:bg-surface-700 rounded-xl transition-all duration-200"
+              style={{
+                padding: '10px',
+                color: 'var(--color-surface-400)',
+                background: 'transparent',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+              }}
               title="Layout Options"
             >
-              <Settings className="w-5 h-5" />
+              <Settings style={{ width: '20px', height: '20px' }} />
             </button>
             {showLayoutMenu && (
-              <div className="absolute right-0 top-full mt-2 bg-surface-800 rounded-xl shadow-xl border border-white/[0.08] py-2 z-50 min-w-[180px] animate-scale-in">
-                <button onClick={() => { setPreviewPosition('left'); setShowLayoutMenu(false) }} className="w-full px-4 py-2.5 text-left text-sm text-surface-300 hover:text-white hover:bg-surface-700 flex items-center gap-3 transition-colors">
-                  <PanelLeft className="w-4 h-4" /> Preview Left
-                </button>
-                <button onClick={() => { setPreviewPosition('right'); setShowLayoutMenu(false) }} className="w-full px-4 py-2.5 text-left text-sm text-surface-300 hover:text-white hover:bg-surface-700 flex items-center gap-3 transition-colors">
-                  <PanelRight className="w-4 h-4" /> Preview Right
-                </button>
-                <button onClick={() => { setPreviewPosition('bottom'); setShowLayoutMenu(false) }} className="w-full px-4 py-2.5 text-left text-sm text-surface-300 hover:text-white hover:bg-surface-700 flex items-center gap-3 transition-colors">
-                  <PanelBottom className="w-4 h-4" /> Preview Bottom
-                </button>
-                <button onClick={() => { setPreviewPosition(previewPosition === 'hidden' ? 'right' : 'hidden'); setShowLayoutMenu(false) }} className="w-full px-4 py-2.5 text-left text-sm text-surface-300 hover:text-white hover:bg-surface-700 flex items-center gap-3 transition-colors">
-                  {previewPosition === 'hidden' ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  {previewPosition === 'hidden' ? 'Show Preview' : 'Hide Preview'}
-                </button>
+              <div 
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  marginTop: '8px',
+                  background: 'var(--color-surface-800)',
+                  borderRadius: '14px',
+                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  padding: '8px 0',
+                  zIndex: 50,
+                  minWidth: '180px',
+                  animation: 'scale-in 0.2s ease',
+                }}
+              >
+                {[
+                  { pos: 'left', icon: PanelLeft, label: 'Preview Left' },
+                  { pos: 'right', icon: PanelRight, label: 'Preview Right' },
+                  { pos: 'bottom', icon: PanelBottom, label: 'Preview Bottom' },
+                ].map(({ pos, icon: Icon, label }) => (
+                  <button
+                    key={pos}
+                    onClick={() => { setPreviewPosition(pos); setShowLayoutMenu(false) }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      color: 'var(--color-surface-300)',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}
+                  >
+                    <Icon style={{ width: '16px', height: '16px' }} /> {label}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -236,27 +499,77 @@ export const Editor = () => {
           {/* Fullscreen Toggle */}
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="hidden md:flex p-2 text-surface-400 hover:text-white hover:bg-surface-700 rounded-xl transition-all duration-200"
+            style={{
+              padding: '10px',
+              color: 'var(--color-surface-400)',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            className="hidden-mobile"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#ffffff'
+              e.currentTarget.style.background = 'var(--color-surface-700)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-surface-400)'
+              e.currentTarget.style.background = 'transparent'
+            }}
             title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
           >
-            {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            {isFullscreen ? <Minimize2 style={{ width: '20px', height: '20px' }} /> : <Maximize2 style={{ width: '20px', height: '20px' }} />}
           </button>
 
-          <div className="hidden md:block h-6 w-px bg-white/[0.06]"></div>
+          <div style={{ height: '24px', width: '1px', background: 'rgba(255, 255, 255, 0.06)' }} className="hidden-mobile" />
 
           {/* Auto-run toggle */}
-          <label className="hidden md:flex items-center gap-2.5 px-3 py-2 bg-surface-800 rounded-xl border border-white/[0.06] cursor-pointer hover:border-white/[0.1] transition-all duration-200 group">
-            <div className="relative">
+          <label 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '8px 12px',
+              background: 'var(--color-surface-800)',
+              borderRadius: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            className="hidden-mobile"
+          >
+            <div style={{ position: 'relative' }}>
               <input
                 type="checkbox"
                 checked={autoRun}
                 onChange={(e) => setAutoRun(e.target.checked)}
-                className="sr-only peer"
+                style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
               />
-              <div className="w-9 h-5 bg-surface-600 rounded-full peer-checked:bg-primary-500 transition-colors"></div>
-              <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+              <div 
+                style={{
+                  width: '36px',
+                  height: '20px',
+                  background: autoRun ? 'var(--color-primary-500)' : 'var(--color-surface-600)',
+                  borderRadius: '100px',
+                  transition: 'background 0.2s ease',
+                }}
+              />
+              <div 
+                style={{
+                  position: 'absolute',
+                  left: autoRun ? '18px' : '2px',
+                  top: '2px',
+                  width: '16px',
+                  height: '16px',
+                  background: '#ffffff',
+                  borderRadius: '50%',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  transition: 'left 0.2s ease',
+                }}
+              />
             </div>
-            <span className="text-sm font-medium text-surface-400 group-hover:text-white transition-colors whitespace-nowrap">
+            <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-surface-400)', whiteSpace: 'nowrap' }}>
               Auto-run
             </span>
           </label>
@@ -265,24 +578,72 @@ export const Editor = () => {
           {!autoRun && (
             <button
               onClick={() => setPreviewKey(prev => prev + 1)}
-              className="hidden md:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-xl transition-all duration-200 font-medium shadow-lg shadow-emerald-500/20 active:scale-95"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 16px',
+                background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '12px',
+                fontWeight: 500,
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+              }}
+              className="hidden-mobile"
               title="Run Code (Ctrl+Enter)"
             >
-              <Play className="w-4 h-4" />
-              <span className="hidden lg:inline">Run</span>
+              <Play style={{ width: '16px', height: '16px' }} />
+              <span className="hidden-tablet">Run</span>
             </button>
           )}
           
           {/* Share button */}
           <button
             onClick={handleShare}
-            className="relative flex items-center gap-2 px-3 md:px-4 py-2 bg-surface-700 hover:bg-surface-600 text-surface-300 hover:text-white rounded-xl transition-all duration-200 border border-white/[0.06] hover:border-white/[0.1] font-medium group"
+            style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              background: 'var(--color-surface-700)',
+              color: 'var(--color-surface-300)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '12px',
+              fontWeight: 500,
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--color-surface-600)'
+              e.currentTarget.style.color = '#ffffff'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--color-surface-700)'
+              e.currentTarget.style.color = 'var(--color-surface-300)'
+            }}
             title="Share Project"
           >
-            <Share2 className="w-4 h-4 transition-transform group-hover:scale-110" />
-            <span className="hidden sm:inline">{shareSuccess ? 'Copied!' : 'Share'}</span>
+            <Share2 style={{ width: '16px', height: '16px' }} />
+            <span className="hidden-mobile">{shareSuccess ? 'Copied!' : 'Share'}</span>
             {shareSuccess && (
-              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping"></div>
+              <div 
+                style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  width: '10px',
+                  height: '10px',
+                  background: '#34d399',
+                  borderRadius: '50%',
+                  animation: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite',
+                }}
+              />
             )}
           </button>
           
@@ -290,81 +651,302 @@ export const Editor = () => {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 md:px-5 py-2 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 disabled:from-emerald-600 disabled:to-emerald-500 text-white rounded-xl transition-all duration-200 font-semibold shadow-lg shadow-primary-500/20 active:scale-95 disabled:scale-100"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              background: saving 
+                ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
+                : 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '12px',
+              fontWeight: 600,
+              fontSize: '14px',
+              cursor: saving ? 'default' : 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 4px 14px rgba(59, 130, 246, 0.25)',
+            }}
             title="Save Project (Ctrl+S)"
           >
-            <Save className={`w-4 h-4 ${saving ? 'animate-pulse' : ''}`} />
-            <span className="hidden sm:inline">{saving ? 'Saved!' : 'Save'}</span>
+            <Save style={{ width: '16px', height: '16px', ...(saving ? { animation: 'pulse 1s ease-in-out infinite' } : {}) }} />
+            <span className="hidden-mobile">{saving ? 'Saved!' : 'Save'}</span>
           </button>
         </div>
       </div>
 
       {/* Mobile Tab Bar */}
-      <div className="lg:hidden flex border-b border-white/[0.06] bg-surface-900">
-        {['html', 'css', 'js', 'preview'].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-all duration-200 border-b-2 ${
-              activeTab === tab 
-                ? 'text-primary-400 border-primary-500 bg-primary-500/10' 
-                : 'text-surface-500 border-transparent hover:text-white hover:bg-surface-800'
-            }`}
-          >
-            {tab === 'html' && <Code className="w-4 h-4 inline mr-1.5 text-orange-400" />}
-            {tab === 'css' && <Palette className="w-4 h-4 inline mr-1.5 text-cyan-400" />}
-            {tab === 'js' && <Zap className="w-4 h-4 inline mr-1.5 text-yellow-400" />}
-            {tab === 'preview' && <Eye className="w-4 h-4 inline mr-1.5 text-emerald-400" />}
-            {tab.toUpperCase()}
-          </button>
-        ))}
+      <div 
+        style={{
+          display: 'flex',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          background: 'rgba(15, 15, 23, 0.95)',
+        }}
+        className="visible-mobile"
+      >
+        {['html', 'css', 'js', 'preview'].map((tab) => {
+          const isActive = activeTab === tab
+          const tabColors = {
+            html: { icon: Code, color: '#fb923c' },
+            css: { icon: Palette, color: '#22d3ee' },
+            js: { icon: Zap, color: '#facc15' },
+            preview: { icon: Eye, color: '#34d399' },
+          }
+          const TabIcon = tabColors[tab].icon
+          
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                flex: 1,
+                padding: '14px 16px',
+                fontSize: '14px',
+                fontWeight: 500,
+                transition: 'all 0.2s ease',
+                borderBottom: isActive ? '2px solid var(--color-primary-500)' : '2px solid transparent',
+                background: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                color: isActive ? 'var(--color-primary-400)' : 'var(--color-surface-500)',
+                border: 'none',
+                borderBottomWidth: '2px',
+                borderBottomStyle: 'solid',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+            >
+              <TabIcon style={{ width: '16px', height: '16px', color: tabColors[tab].color }} />
+              {tab.toUpperCase()}
+            </button>
+          )
+        })}
       </div>
 
       {/* Editor Layout */}
-      <div className={`flex-1 grid ${getLayoutClasses()} overflow-hidden`}>
+      <div 
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: previewPosition === 'bottom' ? 'column' : 'row',
+          overflow: 'hidden',
+        }}
+      >
         {/* Code Editors - Order changes based on preview position */}
-        {previewPosition === 'left' && previewPosition !== 'hidden' && (
-          <PreviewSection 
-            previewKey={previewKey} 
-            html={html} 
-            css={css} 
-            js={js}
-            previewDevice={previewDevice}
-            setPreviewDevice={setPreviewDevice}
-            showDeviceMenu={showDeviceMenu}
-            setShowDeviceMenu={setShowDeviceMenu}
-            getDeviceWidth={getDeviceWidth}
-            setPreviewKey={setPreviewKey}
-          />
+        {previewPosition === 'left' && !isCodePanelHidden && (
+          <div 
+            style={{ height: '100%', width: `${100 - editorPanelSize}%` }}
+            className="hidden-mobile"
+          >
+            <PreviewSection 
+              previewKey={previewKey} 
+              html={html} 
+              css={css} 
+              js={js}
+              previewDevice={previewDevice}
+              setPreviewDevice={setPreviewDevice}
+              showDeviceMenu={showDeviceMenu}
+              setShowDeviceMenu={setShowDeviceMenu}
+              getDeviceWidth={getDeviceWidth}
+              setPreviewKey={setPreviewKey}
+            />
+          </div>
         )}
 
-        {/* Code Editors Section - WHITE BACKGROUND for clean code feel */}
-        <div className={`${previewPosition === 'hidden' ? '' : 'hidden lg:grid'} ${previewPosition === 'bottom' ? 'grid-cols-3' : 'grid-rows-3'} ${previewPosition !== 'left' ? 'lg:border-r' : 'lg:border-l'} border-white/[0.06] bg-white`}>
-          <div className={`${previewPosition === 'bottom' ? 'border-r' : 'border-b'} border-gray-200 relative group`}>
-            <div className="absolute top-3 right-3 z-10 flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <Code className="w-3.5 h-3.5 text-orange-500" />
-              <span className="text-xs font-medium text-orange-600">HTML</span>
+        {/* Main Resize Handle - Between code editors and preview (for left position) */}
+        {previewPosition === 'left' && !isCodePanelHidden && (
+          <div
+            ref={mainSplitRef}
+            style={{
+              display: 'none',
+              width: '8px',
+              height: '100%',
+              cursor: 'col-resize',
+              background: 'var(--color-surface-700)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 0.15s ease',
+              flexShrink: 0,
+            }}
+            className="main-resize-handle"
+            onMouseDown={handleMainSplitMouseDown}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-primary-500)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface-700)'}
+          >
+            <GripVertical style={{ width: '12px', height: '12px', color: 'var(--color-surface-500)' }} />
+          </div>
+        )}
+
+        {/* Code Editors Section - Resizable panels */}
+        {!isCodePanelHidden && (
+        <div 
+          ref={previewPosition === 'bottom' ? horizontalResize.containerRef : verticalResize.containerRef}
+          style={{
+            display: previewPosition === 'hidden' ? 'flex' : 'none',
+            flexDirection: previewPosition === 'bottom' ? 'row' : 'column',
+            background: '#ffffff',
+            width: previewPosition === 'hidden' ? '100%' : previewPosition === 'bottom' ? '100%' : `${editorPanelSize}%`,
+            height: previewPosition === 'bottom' ? `${editorPanelSize}%` : '100%',
+          }}
+          className="code-editors-desktop"
+        >
+          {/* HTML Editor */}
+          <div 
+            style={{ 
+              position: 'relative',
+              overflow: 'hidden',
+              [previewPosition === 'bottom' ? 'width' : 'height']: `${(previewPosition === 'bottom' ? horizontalResize : verticalResize).sizes[0]}%`,
+              minHeight: previewPosition === 'bottom' ? 'auto' : '50px',
+              minWidth: previewPosition === 'bottom' ? '50px' : 'auto',
+            }}
+          >
+            <div 
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                zIndex: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 12px',
+                background: '#fff7ed',
+                border: '1px solid #fed7aa',
+                borderRadius: '8px',
+                opacity: 0,
+                transition: 'opacity 0.2s ease',
+              }}
+              className="editor-label"
+            >
+              <Code style={{ width: '14px', height: '14px', color: '#f97316' }} />
+              <span style={{ fontSize: '12px', fontWeight: 500, color: '#ea580c' }}>HTML</span>
             </div>
             <CodeEditor language="html" value={html} onChange={setHtml} theme="light" />
           </div>
-          <div className={`${previewPosition === 'bottom' ? 'border-r' : 'border-b'} border-gray-200 relative group`}>
-            <div className="absolute top-3 right-3 z-10 flex items-center gap-2 px-3 py-1.5 bg-cyan-50 border border-cyan-200 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <Palette className="w-3.5 h-3.5 text-cyan-500" />
-              <span className="text-xs font-medium text-cyan-600">CSS</span>
+
+          {/* Resize Handle 1 */}
+          <ResizeHandle 
+            direction={previewPosition === 'bottom' ? 'horizontal' : 'vertical'}
+            onMouseDown={(e) => (previewPosition === 'bottom' ? horizontalResize : verticalResize).handleMouseDown(0, e)}
+          />
+
+          {/* CSS Editor */}
+          <div 
+            style={{ 
+              position: 'relative',
+              overflow: 'hidden',
+              [previewPosition === 'bottom' ? 'width' : 'height']: `${(previewPosition === 'bottom' ? horizontalResize : verticalResize).sizes[1]}%`,
+              minHeight: previewPosition === 'bottom' ? 'auto' : '50px',
+              minWidth: previewPosition === 'bottom' ? '50px' : 'auto',
+            }}
+          >
+            <div 
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                zIndex: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 12px',
+                background: '#ecfeff',
+                border: '1px solid #a5f3fc',
+                borderRadius: '8px',
+                opacity: 0,
+                transition: 'opacity 0.2s ease',
+              }}
+              className="editor-label"
+            >
+              <Palette style={{ width: '14px', height: '14px', color: '#06b6d4' }} />
+              <span style={{ fontSize: '12px', fontWeight: 500, color: '#0891b2' }}>CSS</span>
             </div>
             <CodeEditor language="css" value={css} onChange={setCss} theme="light" />
           </div>
-          <div className="relative group">
-            <div className="absolute top-3 right-3 z-10 flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <Zap className="w-3.5 h-3.5 text-amber-500" />
-              <span className="text-xs font-medium text-amber-600">JavaScript</span>
+
+          {/* Resize Handle 2 */}
+          <ResizeHandle 
+            direction={previewPosition === 'bottom' ? 'horizontal' : 'vertical'}
+            onMouseDown={(e) => (previewPosition === 'bottom' ? horizontalResize : verticalResize).handleMouseDown(1, e)}
+          />
+
+          {/* JavaScript Editor */}
+          <div 
+            style={{ 
+              position: 'relative',
+              overflow: 'hidden',
+              [previewPosition === 'bottom' ? 'width' : 'height']: `${(previewPosition === 'bottom' ? horizontalResize : verticalResize).sizes[2]}%`,
+              minHeight: previewPosition === 'bottom' ? 'auto' : '50px',
+              minWidth: previewPosition === 'bottom' ? '50px' : 'auto',
+            }}
+          >
+            <div 
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                zIndex: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 12px',
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                borderRadius: '8px',
+                opacity: 0,
+                transition: 'opacity 0.2s ease',
+              }}
+              className="editor-label"
+            >
+              <Zap style={{ width: '14px', height: '14px', color: '#f59e0b' }} />
+              <span style={{ fontSize: '12px', fontWeight: 500, color: '#d97706' }}>JavaScript</span>
             </div>
             <CodeEditor language="javascript" value={js} onChange={setJs} theme="light" />
           </div>
         </div>
+        )}
+
+        {/* Main Resize Handle - Between code editors and preview (for right/bottom position) */}
+        {previewPosition !== 'left' && previewPosition !== 'hidden' && !isCodePanelHidden && (
+          <div
+            ref={mainSplitRef}
+            style={{
+              display: 'none',
+              width: previewPosition === 'bottom' ? '100%' : '8px',
+              height: previewPosition === 'bottom' ? '8px' : '100%',
+              cursor: previewPosition === 'bottom' ? 'row-resize' : 'col-resize',
+              background: 'var(--color-surface-700)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 0.15s ease',
+              flexShrink: 0,
+            }}
+            className="main-resize-handle"
+            onMouseDown={handleMainSplitMouseDown}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-primary-500)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface-700)'}
+          >
+            <GripVertical 
+              style={{ 
+                width: '12px', 
+                height: '12px', 
+                color: 'var(--color-surface-500)',
+                transform: previewPosition === 'bottom' ? 'rotate(90deg)' : 'none',
+              }} 
+            />
+          </div>
+        )}
 
         {/* Mobile: Show active tab only - WHITE BACKGROUND for editor tabs */}
-        <div className="lg:hidden flex-1 bg-white">
+        <div 
+          style={{
+            flex: 1,
+            background: '#ffffff',
+          }}
+          className="visible-mobile"
+        >
           {activeTab === 'html' && <CodeEditor language="html" value={html} onChange={setHtml} theme="light" />}
           {activeTab === 'css' && <CodeEditor language="css" value={css} onChange={setCss} theme="light" />}
           {activeTab === 'js' && <CodeEditor language="javascript" value={js} onChange={setJs} theme="light" />}
@@ -387,7 +969,14 @@ export const Editor = () => {
 
         {/* Preview Pane - Right or Bottom */}
         {previewPosition !== 'left' && previewPosition !== 'hidden' && (
-          <div className="hidden lg:block">
+          <div 
+            style={{
+              display: 'none',
+              width: previewPosition === 'bottom' ? '100%' : isCodePanelHidden ? '100%' : `${100 - editorPanelSize}%`,
+              height: previewPosition === 'bottom' ? (isCodePanelHidden ? '100%' : `${100 - editorPanelSize}%`) : '100%',
+            }}
+            className="preview-pane-desktop"
+          >
             <PreviewSection 
               previewKey={previewKey} 
               html={html} 
@@ -405,10 +994,63 @@ export const Editor = () => {
       </div>
 
       {/* Keyboard Shortcuts Hint */}
-      <div className="hidden md:flex items-center justify-center gap-6 py-2.5 bg-surface-900 border-t border-white/[0.06] text-xs text-surface-500">
-        <span><kbd>Ctrl</kbd> + <kbd>S</kbd> Save</span>
-        <span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> Run</span>
+      <div 
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '24px',
+          padding: '10px',
+          background: 'rgba(15, 15, 23, 0.95)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+          fontSize: '12px',
+          color: 'var(--color-surface-500)',
+        }}
+        className="hidden-mobile"
+      >
+        <span>
+          <kbd style={{ padding: '2px 6px', background: 'var(--color-surface-800)', borderRadius: '4px', marginRight: '4px' }}>Ctrl</kbd> 
+          + <kbd style={{ padding: '2px 6px', background: 'var(--color-surface-800)', borderRadius: '4px', margin: '0 4px' }}>S</kbd> Save
+        </span>
+        <span>
+          <kbd style={{ padding: '2px 6px', background: 'var(--color-surface-800)', borderRadius: '4px', marginRight: '4px' }}>Ctrl</kbd> 
+          + <kbd style={{ padding: '2px 6px', background: 'var(--color-surface-800)', borderRadius: '4px', margin: '0 4px' }}>Enter</kbd> Run
+        </span>
       </div>
+
+      {/* Responsive CSS */}
+      <style>{`
+        @media (min-width: 1024px) {
+          .hidden-mobile { display: flex !important; }
+          .visible-mobile { display: none !important; }
+          .code-editors-desktop { display: flex !important; }
+          .preview-pane-desktop { display: flex !important; }
+          .main-resize-handle { display: flex !important; }
+        }
+        @media (max-width: 1023px) {
+          .hidden-mobile { display: none !important; }
+          .visible-mobile { display: flex !important; }
+          .code-editors-desktop { display: none !important; }
+          .preview-pane-desktop { display: none !important; }
+          .main-resize-handle { display: none !important; }
+        }
+        @media (max-width: 768px) {
+          .hidden-tablet { display: none !important; }
+        }
+        .code-editors-desktop > div:hover .editor-label {
+          opacity: 1 !important;
+        }
+        @keyframes ping {
+          75%, 100% {
+            transform: scale(2);
+            opacity: 0;
+          }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+      `}</style>
     </div>
   )
 }
@@ -422,62 +1064,227 @@ const PreviewSection = ({
   isMobile = false
 }) => {
   return (
-    <div className={`bg-surface-900 relative flex flex-col ${isMobile ? 'h-full' : 'h-full'}`}>
+    <div 
+      style={{
+        background: 'var(--color-surface-900)',
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        height: '100%',
+        minHeight: 0,
+      }}
+    >
       {/* Preview Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-surface-850 border-b border-white/[0.06]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse-subtle shadow-lg shadow-emerald-400/50"></div>
-          <span className="text-sm font-medium text-surface-300">Live Preview</span>
+      <div 
+        style={{
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px 16px',
+          background: 'var(--color-surface-850)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div 
+            style={{
+              width: '8px',
+              height: '8px',
+              background: '#34d399',
+              borderRadius: '50%',
+              boxShadow: '0 0 8px rgba(52, 211, 153, 0.5)',
+              animation: 'pulse-subtle 2s ease-in-out infinite',
+            }}
+          />
+          <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-surface-300)' }}>
+            Live Preview
+          </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* Device Selector */}
-          <div className="relative">
+          <div style={{ position: 'relative' }}>
             <button
               onClick={(e) => { e.stopPropagation(); setShowDeviceMenu(!showDeviceMenu) }}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-surface-400 hover:text-white hover:bg-surface-700 rounded-lg transition-all duration-200"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 12px',
+                fontSize: '14px',
+                color: 'var(--color-surface-400)',
+                background: 'transparent',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
             >
-              {previewDevice === 'desktop' && <Monitor className="w-4 h-4" />}
-              {previewDevice === 'tablet' && <Tablet className="w-4 h-4" />}
-              {previewDevice === 'mobile' && <Smartphone className="w-4 h-4" />}
-              <ChevronDown className="w-3 h-3" />
+              {previewDevice === 'desktop' && <Monitor style={{ width: '16px', height: '16px' }} />}
+              {previewDevice === 'tablet' && <Tablet style={{ width: '16px', height: '16px' }} />}
+              {previewDevice === 'mobile' && <Smartphone style={{ width: '16px', height: '16px' }} />}
+              <ChevronDown style={{ width: '12px', height: '12px' }} />
             </button>
             {showDeviceMenu && (
-              <div className="absolute right-0 top-full mt-1 bg-surface-800 rounded-xl shadow-xl border border-white/[0.08] py-1.5 z-50 animate-scale-in">
-                <button onClick={() => { setPreviewDevice('desktop'); setShowDeviceMenu(false) }} className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2.5 transition-colors ${previewDevice === 'desktop' ? 'text-primary-400 bg-primary-500/10' : 'text-surface-300 hover:text-white hover:bg-surface-700'}`}>
-                  <Monitor className="w-4 h-4" /> Desktop
-                </button>
-                <button onClick={() => { setPreviewDevice('tablet'); setShowDeviceMenu(false) }} className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2.5 transition-colors ${previewDevice === 'tablet' ? 'text-primary-400 bg-primary-500/10' : 'text-surface-300 hover:text-white hover:bg-surface-700'}`}>
-                  <Tablet className="w-4 h-4" /> Tablet
-                </button>
-                <button onClick={() => { setPreviewDevice('mobile'); setShowDeviceMenu(false) }} className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2.5 transition-colors ${previewDevice === 'mobile' ? 'text-primary-400 bg-primary-500/10' : 'text-surface-300 hover:text-white hover:bg-surface-700'}`}>
-                  <Smartphone className="w-4 h-4" /> Mobile
-                </button>
+              <div 
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  marginTop: '4px',
+                  background: 'var(--color-surface-800)',
+                  borderRadius: '14px',
+                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  padding: '6px',
+                  zIndex: 50,
+                  animation: 'scale-in 0.2s ease',
+                }}
+              >
+                {[
+                  { device: 'desktop', icon: Monitor, label: 'Desktop' },
+                  { device: 'tablet', icon: Tablet, label: 'Tablet' },
+                  { device: 'mobile', icon: Smartphone, label: 'Mobile' },
+                ].map(({ device, icon: Icon, label }) => (
+                  <button
+                    key={device}
+                    onClick={() => { setPreviewDevice(device); setShowDeviceMenu(false) }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      background: previewDevice === device ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                      color: previewDevice === device ? 'var(--color-primary-400)' : 'var(--color-surface-300)',
+                      border: 'none',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <Icon style={{ width: '16px', height: '16px' }} /> {label}
+                  </button>
+                ))}
               </div>
             )}
           </div>
           {/* Refresh Button */}
           <button
             onClick={() => setPreviewKey(prev => prev + 1)}
-            className="p-1.5 text-surface-500 hover:text-white hover:bg-surface-700 rounded-lg transition-all duration-200"
+            style={{
+              padding: '6px',
+              color: 'var(--color-surface-500)',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#ffffff'
+              e.currentTarget.style.background = 'var(--color-surface-700)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-surface-500)'
+              e.currentTarget.style.background = 'transparent'
+            }}
             title="Refresh Preview"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw style={{ width: '16px', height: '16px' }} />
           </button>
         </div>
       </div>
-      {/* Preview Content - White background preview area */}
-      <div className="flex-1 flex items-center justify-center p-4 overflow-auto bg-surface-950/50">
-        <div 
-          className="bg-white shadow-2xl rounded-xl overflow-hidden h-full transition-all duration-300"
+      {/* Preview Content - Full stretch for desktop, device frame for mobile/tablet */}
+      <div 
+        style={{
+          flex: 1,
+          minHeight: 0,
+          ...(previewDevice === 'desktop' 
+            ? {} 
+            : { 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                padding: '16px',
+                background: 'rgba(10, 10, 15, 0.5)',
+              }
+          ),
+        }}
+      >
+        {previewDevice === 'desktop' ? (
+          // Desktop: Full stretch preview - absolute fill
+          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            <div style={{ position: 'absolute', inset: 0, background: '#ffffff' }}>
+              <PreviewErrorBoundary key={previewKey}>
+                <PreviewPane html={html} css={css} js={js} />
+              </PreviewErrorBoundary>
+            </div>
+          </div>
+        ) : (
+          // Mobile/Tablet: Device frame preview
+          <div 
+            style={{ 
+              background: '#ffffff',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)',
+              overflow: 'hidden',
+              height: '100%',
+              transition: 'all 0.3s ease',
+              width: getDeviceWidth(),
+              maxWidth: '100%',
+              border: '8px solid #1e1e2e',
+              borderRadius: '24px',
+            }}
+          >
+            <PreviewErrorBoundary key={previewKey}>
+              <PreviewPane html={html} css={css} js={js} />
+            </PreviewErrorBoundary>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Resize Handle Component - draggable divider between panes
+const ResizeHandle = ({ direction, onMouseDown }) => {
+  const isVertical = direction === 'vertical'
+  const [hovered, setHovered] = useState(false)
+  
+  return (
+    <div
+      style={{
+        width: isVertical ? '100%' : '6px',
+        height: isVertical ? '6px' : '100%',
+        cursor: isVertical ? 'row-resize' : 'col-resize',
+        background: hovered ? 'var(--color-primary-400)' : '#e5e7eb',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'background 0.15s ease',
+        flexShrink: 0,
+      }}
+      onMouseDown={onMouseDown}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div 
+        style={{
+          opacity: hovered ? 1 : 0,
+          transition: 'opacity 0.15s ease',
+        }}
+      >
+        <GripVertical 
           style={{ 
-            width: getDeviceWidth(),
-            maxWidth: '100%',
-            border: previewDevice !== 'desktop' ? '8px solid #1e1e2e' : '1px solid rgba(255,255,255,0.1)',
-            borderRadius: previewDevice !== 'desktop' ? '24px' : '12px'
-          }}
-        >
-          <PreviewPane key={previewKey} html={html} css={css} js={js} />
-        </div>
+            width: '12px', 
+            height: '12px', 
+            color: hovered ? '#ffffff' : '#9ca3af',
+            transform: isVertical ? 'rotate(90deg)' : 'none',
+          }} 
+        />
       </div>
     </div>
   )
