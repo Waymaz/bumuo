@@ -1,16 +1,28 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { UsernameSetup } from './UsernameSetup'
+import { LoadingScreen } from './LoadingScreen'
 
 export const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth()
+  const { user, loading, needsUsername, handleProfileCreated } = useAuth()
 
   if (loading) {
+    return <LoadingScreen />
+  }
+
+  if (!user) {
+    return <Navigate to="/login" />
+  }
+
+  // Show username setup modal if user needs to set their username
+  if (needsUsername) {
     return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
+      <>
+        {children}
+        <UsernameSetup onComplete={handleProfileCreated} />
+      </>
     )
   }
 
-  return user ? children : <Navigate to="/login" />
+  return children
 }

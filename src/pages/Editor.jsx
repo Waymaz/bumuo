@@ -3,12 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { 
   Save, Share2, ArrowLeft, Play, Sparkles, Code, Palette, Zap,
   PanelLeft, PanelRight, PanelBottom, EyeOff, Eye, Maximize2, Minimize2,
-  RefreshCw, Settings, ChevronDown, Monitor, Tablet, Smartphone, GripVertical
+  RefreshCw, Settings, ChevronDown, Monitor, Tablet, Smartphone, GripVertical,
+  Globe, Lock
 } from 'lucide-react'
 import { Navbar } from '../components/Navbar'
 import { CodeEditor } from '../components/CodeEditor'
 import { PreviewPane } from '../components/PreviewPane'
 import { PreviewErrorBoundary } from '../components/ErrorBoundary'
+import { VisibilityToggle, PublicConfirmDialog } from '../components/VisibilityToggle'
 import { projectService } from '../services/projectService'
 import { useAuth } from '../context/AuthContext'
 
@@ -93,6 +95,9 @@ export const Editor = () => {
   const [autoRun, setAutoRun] = useState(true)
   const [previewKey, setPreviewKey] = useState(0)
   const [shareSuccess, setShareSuccess] = useState(false)
+  const [isPublic, setIsPublic] = useState(false)
+  const [showPublicConfirm, setShowPublicConfirm] = useState(false)
+  const [togglingVisibility, setTogglingVisibility] = useState(false)
   
   // Layout controls
   const [previewPosition, setPreviewPosition] = useState('right') // 'right', 'left', 'bottom', 'hidden'
@@ -222,7 +227,33 @@ export const Editor = () => {
       setHtml(data.html || '')
       setCss(data.css || '')
       setJs(data.js || '')
+      setIsPublic(data.is_public || false)
     }
+  }
+
+  const handleToggleVisibility = async (newValue) => {
+    // If making public, show confirmation first
+    if (newValue && !isPublic) {
+      setShowPublicConfirm(true)
+      return
+    }
+    
+    setTogglingVisibility(true)
+    const { error } = await projectService.toggleVisibility(id, newValue)
+    if (!error) {
+      setIsPublic(newValue)
+    }
+    setTogglingVisibility(false)
+  }
+
+  const handleConfirmPublic = async () => {
+    setShowPublicConfirm(false)
+    setTogglingVisibility(true)
+    const { error } = await projectService.toggleVisibility(id, true)
+    if (!error) {
+      setIsPublic(true)
+    }
+    setTogglingVisibility(false)
   }
 
   const handleSave = async () => {
@@ -653,6 +684,14 @@ export const Editor = () => {
               />
             )}
           </button>
+          
+          {/* Visibility Toggle */}
+          <VisibilityToggle 
+            isPublic={isPublic}
+            onToggle={handleToggleVisibility}
+            disabled={togglingVisibility}
+            variant="compact"
+          />
           
           {/* Save button */}
           <button
@@ -1279,6 +1318,14 @@ const PreviewSection = ({
           </div>
         )}
       </div>
+      
+      {/* Public Confirm Dialog */}
+      {showPublicConfirm && (
+        <PublicConfirmDialog 
+          onConfirm={handleConfirmPublic}
+          onCancel={() => setShowPublicConfirm(false)}
+        />
+      )}
     </div>
   )
 }

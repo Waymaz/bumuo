@@ -1,9 +1,10 @@
-import { Trash2, ExternalLink, Clock, Code, MoreVertical, Play } from 'lucide-react'
+import { Trash2, ExternalLink, Clock, Code, MoreVertical, Play, Globe, Lock, GitFork } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { ProjectPreview } from './ProjectPreview'
+import { VisibilityBadge } from './VisibilityToggle'
 
-export const ProjectCard = ({ project, onDelete, viewMode = 'grid' }) => {
+export const ProjectCard = ({ project, onDelete, viewMode = 'grid', showVisibility = false }) => {
   const navigate = useNavigate()
   const [showMenu, setShowMenu] = useState(false)
   const [hovered, setHovered] = useState(false)
@@ -137,20 +138,41 @@ export const ProjectCard = ({ project, onDelete, viewMode = 'grid' }) => {
           )}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 
-            style={{
-              fontWeight: 600,
-              color: hovered ? 'var(--color-primary-400)' : '#ffffff',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              transition: 'color 0.2s ease',
-              fontSize: '16px',
-              marginBottom: '4px',
-            }}
-          >
-            {project.title}
-          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <h3 
+              style={{
+                fontWeight: 600,
+                color: hovered ? 'var(--color-primary-400)' : '#ffffff',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                transition: 'color 0.2s ease',
+                fontSize: '16px',
+              }}
+            >
+              {project.title}
+            </h3>
+            {showVisibility && (
+              <VisibilityBadge isPublic={project.is_public} size="small" />
+            )}
+            {project.forked_from && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '2px 8px',
+                background: 'rgba(168, 85, 247, 0.1)',
+                border: '1px solid rgba(168, 85, 247, 0.2)',
+                borderRadius: '6px',
+                fontSize: '11px',
+                color: '#a855f7',
+                fontWeight: 500,
+              }}>
+                <GitFork style={{ width: '10px', height: '10px' }} />
+                Forked
+              </div>
+            )}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: 'var(--color-surface-400)' }}>
             <Clock style={{ width: '14px', height: '14px' }} />
             <span>{formatDate(project.updated_at)}</span>
@@ -262,21 +284,44 @@ export const ProjectCard = ({ project, onDelete, viewMode = 'grid' }) => {
         {/* Header with title and menu */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
           <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
-            <h3 
-              style={{
-                fontWeight: 600,
-                color: hovered ? 'var(--color-primary-400)' : '#ffffff',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                transition: 'color 0.2s ease',
-                fontSize: '17px',
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+              <h3 
+                style={{
+                  fontWeight: 600,
+                  color: hovered ? 'var(--color-primary-400)' : '#ffffff',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  transition: 'color 0.2s ease',
+                  fontSize: '17px',
+                  lineHeight: 1.3,
+                }}
+              >
+                {project.title}
+              </h3>
+              {showVisibility && (
+                <VisibilityBadge isPublic={project.is_public} size="small" />
+              )}
+            </div>
+            {project.forked_from && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
                 marginBottom: '6px',
-                lineHeight: 1.3,
-              }}
-            >
-              {project.title}
-            </h3>
+                padding: '3px 8px',
+                background: 'rgba(168, 85, 247, 0.1)',
+                border: '1px solid rgba(168, 85, 247, 0.2)',
+                borderRadius: '6px',
+                fontSize: '11px',
+                color: '#a855f7',
+                fontWeight: 500,
+                width: 'fit-content',
+              }}>
+                <GitFork style={{ width: '10px', height: '10px' }} />
+                Forked project
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-surface-400)' }}>
               <Clock style={{ width: '13px', height: '13px' }} />
               <span>{formatDate(project.updated_at)}</span>
