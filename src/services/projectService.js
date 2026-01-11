@@ -80,45 +80,31 @@ export const projectService = {
    * Get a project with creator info (for community view)
    */
   async getProjectWithCreator(id) {
-    const { data, error } = await supabase
+    // Fetch project first (projects.user_id references auth.users, not profiles directly)
+    const { data: project, error } = await supabase
       .from('projects')
-      .select(`
-        *,
-        creator:user_id (
-          id,
-          username,
-          avatar_url
-        )
-      `)
+      .select('*')
       .eq('id', id)
       .single()
     
-    // Fallback: if the join fails, try getting project and profile separately
-    if (error) {
-      const projectResult = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', id)
-        .single()
-      
-      if (projectResult.data) {
-        const profileResult = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url')
-          .eq('id', projectResult.data.user_id)
-          .single()
-        
-        return { 
-          data: { 
-            ...projectResult.data, 
-            creator: profileResult.data 
-          }, 
-          error: null 
-        }
-      }
+    if (error || !project) {
+      return { data: null, error }
     }
     
-    return { data, error }
+    // Then fetch creator profile separately
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .eq('id', project.user_id)
+      .single()
+    
+    return { 
+      data: { 
+        ...project, 
+        creator: profile || null 
+      }, 
+      error: null 
+    }
   },
 
   /**
@@ -227,16 +213,11 @@ export const projectService = {
       searchQuery = ''
     } = options
 
+    // Note: projects.user_id references auth.users, not profiles directly
+    // So we fetch projects first, then get profiles separately
     let query = supabase
       .from('projects')
-      .select(`
-        *,
-        creator:profiles!projects_user_id_fkey (
-          id,
-          username,
-          avatar_url
-        )
-      `, { count: 'exact' })
+      .select('*', { count: 'exact' })
       .eq('is_public', true)
 
     // Apply search filter
@@ -262,11 +243,10 @@ export const projectService = {
 
     const { data, error, count } = await query
 
-    // Fallback: if creator join fails, fetch profiles separately
-    if (data && !error) {
-      const projectsNeedingProfiles = data.filter(p => !p.creator)
-      if (projectsNeedingProfiles.length > 0) {
-        const userIds = [...new Set(projectsNeedingProfiles.map(p => p.user_id))]
+    // Fetch creator profiles separately (projects.user_id references auth.users, not profiles)
+    if (data && data.length > 0 && !error) {
+      const userIds = [...new Set(data.map(p => p.user_id).filter(Boolean))]
+      if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, username, avatar_url')
@@ -279,9 +259,7 @@ export const projectService = {
           }, {})
           
           data.forEach(project => {
-            if (!project.creator && profileMap[project.user_id]) {
-              project.creator = profileMap[project.user_id]
-            }
+            project.creator = profileMap[project.user_id] || null
           })
         }
       }
@@ -383,31 +361,22 @@ export const projectService = {
   async getOriginalProjectInfo(forkedFromId) {
     if (!forkedFromId) return { data: null, error: null }
     
+    // Fetch project first (projects.user_id references auth.users, not profiles)
     const { data, error } = await supabase
       .from('projects')
-      .select(`
-        id,
-        title,
-        user_id,
-        creator:profiles!projects_user_id_fkey (
-          username,
-          avatar_url
-        )
-      `)
+      .select('id, title, user_id')
       .eq('id', forkedFromId)
       .single()
     
-    // Fallback for profile join
-    if (data && !data.creator) {
+    // Then fetch creator profile separately
+    if (data && data.user_id) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('username, avatar_url')
         .eq('id', data.user_id)
         .single()
       
-      if (profile) {
-        data.creator = profile
-      }
+      data.creator = profile || null
     }
     
     return { data, error }

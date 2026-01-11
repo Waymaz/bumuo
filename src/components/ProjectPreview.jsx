@@ -1,6 +1,34 @@
 import { useMemo, useState } from 'react'
 import { Code2, Eye, EyeOff } from 'lucide-react'
 
+// Sanitize HTML to remove external resource references that would cause 404 errors
+// This preserves inline content but removes src/href attributes pointing to local files
+const sanitizeHtmlForPreview = (html) => {
+  if (!html) return ''
+  
+  // Remove script tags with src attributes (external scripts)
+  // But keep inline scripts (those without src or with data:/https:/http: URLs)
+  let sanitized = html.replace(
+    /<script\s+[^>]*src=["'](?!data:|https?:\/\/|blob:)([^"']*)["'][^>]*>\s*<\/script>/gi,
+    '<!-- External script removed: $1 -->'
+  )
+  
+  // Remove link tags with href to local stylesheets
+  // But keep external CDN stylesheets (https://)
+  sanitized = sanitized.replace(
+    /<link\s+[^>]*href=["'](?!data:|https?:\/\/|blob:)([^"']*\.css)["'][^>]*\/?>/gi,
+    '<!-- External stylesheet removed: $1 -->'
+  )
+  
+  // Remove img src pointing to local files (but keep data:, https://, http://, blob:)
+  sanitized = sanitized.replace(
+    /(<img\s+[^>]*src=["'])(?!data:|https?:\/\/|blob:)([^"']+)(["'][^>]*>)/gi,
+    '$1data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7$3'
+  )
+  
+  return sanitized
+}
+
 /**
  * ProjectPreview - Renders a live mini preview of the project code
  * Uses a scaled iframe to show actual rendered output
@@ -15,6 +43,9 @@ export const ProjectPreview = ({ html, css, js, isHovered = false }) => {
   // Generate the preview document
   const srcDoc = useMemo(() => {
     if (!hasContent) return null
+    
+    // Sanitize HTML to remove external resource references that would cause 404s
+    const safeHtml = sanitizeHtmlForPreview(html)
     
     return `
       <!DOCTYPE html>
@@ -47,7 +78,7 @@ export const ProjectPreview = ({ html, css, js, isHovered = false }) => {
           </style>
         </head>
         <body>
-          ${html || ''}
+          ${safeHtml}
           <script>
             // Suppress all errors in preview thumbnail
             window.onerror = function() { return true; };
