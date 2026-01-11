@@ -1087,6 +1087,14 @@ export const Editor = () => {
         </span>
       </div>
 
+      {/* Public Confirm Dialog */}
+      {showPublicConfirm && (
+        <PublicConfirmDialog 
+          onConfirm={handleConfirmPublic}
+          onCancel={() => setShowPublicConfirm(false)}
+        />
+      )}
+
       {/* Responsive CSS */}
       <style>{`
         @media (min-width: 1024px) {
@@ -1318,14 +1326,6 @@ const PreviewSection = ({
           </div>
         )}
       </div>
-      
-      {/* Public Confirm Dialog */}
-      {showPublicConfirm && (
-        <PublicConfirmDialog 
-          onConfirm={handleConfirmPublic}
-          onCancel={() => setShowPublicConfirm(false)}
-        />
-      )}
     </div>
   )
 }
