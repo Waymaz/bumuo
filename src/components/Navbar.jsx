@@ -1,7 +1,8 @@
-import { Code2, LogOut, Menu, X } from 'lucide-react'
+import { LogOut, Menu, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
+import bumuoLogo from '../assets/bumuo-logo.png'
 
 export const Navbar = () => {
   const { user, signOut } = useAuth()
@@ -46,11 +47,9 @@ export const Navbar = () => {
   }
 
   const logoIconStyle = {
-    padding: '10px',
-    background: logoHover 
-      ? 'linear-gradient(135deg, var(--color-primary-400) 0%, var(--color-primary-500) 100%)'
-      : 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%)',
-    borderRadius: '12px',
+    width: '40px',
+    height: '40px',
+    borderRadius: '10px',
     transition: 'all 0.3s ease',
     boxShadow: logoHover 
       ? '0 8px 20px rgba(59, 130, 246, 0.35)'
@@ -109,9 +108,11 @@ export const Navbar = () => {
             onMouseEnter={() => setLogoHover(true)}
             onMouseLeave={() => setLogoHover(false)}
           >
-            <div style={logoIconStyle}>
-              <Code2 style={{ width: '24px', height: '24px', color: '#ffffff' }} />
-            </div>
+            <img 
+              src={bumuoLogo} 
+              alt="BumuO" 
+              style={logoIconStyle}
+            />
             <span 
               style={{
                 fontSize: '20px',

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Code2, Mail, Lock, ArrowRight, Eye, EyeOff, CheckCircle, Loader2 } from 'lucide-react'
+import { Mail, Lock, ArrowRight, Eye, EyeOff, CheckCircle, Loader2 } from 'lucide-react'
+import bumuoLogo from '../assets/bumuo-logo.png'
 
 // Google Icon Component
 const GoogleIcon = () => (
@@ -208,16 +209,16 @@ export const Register = () => {
               marginBottom: '16px',
             }}
           >
-            <div 
+            <img 
+              src={bumuoLogo} 
+              alt="BumuO" 
               style={{
-                padding: '14px',
-                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
-                borderRadius: '16px',
-                border: '1px solid rgba(59, 130, 246, 0.2)',
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                boxShadow: '0 4px 14px rgba(59, 130, 246, 0.2)',
               }}
-            >
-              <Code2 style={{ width: '32px', height: '32px', color: 'var(--color-primary-400)' }} />
-            </div>
+            />
             <h1 
               style={{
                 fontSize: '32px',
