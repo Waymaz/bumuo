@@ -7,6 +7,7 @@ import { Register } from './pages/Register'
 import { Dashboard } from './pages/Dashboard'
 import { Editor } from './pages/Editor'
 import { Share } from './pages/Share'
+import { Community } from './pages/Community'
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/community" element={<Community />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={

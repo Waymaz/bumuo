@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { 
   Plus, Search, Grid3X3, List, Folder, ChevronRight, ChevronDown,
-  Sparkles, TrendingUp, GitFork, Clock, Users, X, ArrowUpDown
+  Sparkles, TrendingUp, GitFork, Clock, Users, X, ArrowUpDown, ArrowRight, Globe
 } from 'lucide-react'
 import { Navbar } from '../components/Navbar'
 import { ProjectCard } from '../components/ProjectCard'
-import { CommunityProjectCard } from '../components/CommunityProjectCard'
-import { CommunityProjectView } from '../components/CommunityProjectView'
 import { useAuth } from '../context/AuthContext'
 import { projectService } from '../services/projectService'
 
@@ -14,7 +13,6 @@ import { projectService } from '../services/projectService'
 const TABS = {
   MY_PROJECTS: 'my-projects',
   FORKED: 'forked',
-  COMMUNITY: 'community',
 }
 
 export const Dashboard = () => {
@@ -30,7 +28,6 @@ export const Dashboard = () => {
   // Projects state
   const [myProjects, setMyProjects] = useState([])
   const [forkedProjects, setForkedProjects] = useState([])
-  const [communityProjects, setCommunityProjects] = useState([])
   const [recentProjects, setRecentProjects] = useState([])
   
   // UI state
@@ -39,13 +36,7 @@ export const Dashboard = () => {
   const [recentCollapsed, setRecentCollapsed] = useState(() => {
     return localStorage.getItem('bumuo-recent-collapsed') === 'true'
   })
-  const [selectedCommunityProject, setSelectedCommunityProject] = useState(null)
   const [showSortDropdown, setShowSortDropdown] = useState(false)
-  
-  // Community pagination
-  const [communityPage, setCommunityPage] = useState(0)
-  const [hasMoreCommunity, setHasMoreCommunity] = useState(true)
-  const [communityLoading, setCommunityLoading] = useState(false)
   
   // Tab indicator animation
   const tabRefs = useRef({})
@@ -88,7 +79,6 @@ export const Dashboard = () => {
         loadMyProjects(),
         loadForkedProjects(),
         loadRecentProjects(),
-        loadCommunityProjects(true),
       ])
     } finally {
       setLoading(false)
@@ -115,42 +105,6 @@ export const Dashboard = () => {
       setRecentProjects(data)
     }
   }
-
-  const loadCommunityProjects = async (reset = false) => {
-    if (communityLoading && !reset) return
-    
-    setCommunityLoading(true)
-    const offset = reset ? 0 : communityPage * 20
-    
-    try {
-      const { data, error } = await projectService.getCommunityProjects({
-        limit: 20,
-        offset,
-        sortBy,
-        searchQuery: activeTab === TABS.COMMUNITY ? searchQuery : '',
-      })
-      
-      if (!error && data) {
-        if (reset) {
-          setCommunityProjects(data)
-          setCommunityPage(1)
-        } else {
-          setCommunityProjects(prev => [...prev, ...data])
-          setCommunityPage(prev => prev + 1)
-        }
-        setHasMoreCommunity(data.length === 20)
-      }
-    } finally {
-      setCommunityLoading(false)
-    }
-  }
-
-  // Reload community when sort changes
-  useEffect(() => {
-    if (activeTab === TABS.COMMUNITY && !loading) {
-      loadCommunityProjects(true)
-    }
-  }, [sortBy])
 
   const handleCreateProject = async (e) => {
     e.preventDefault()
@@ -188,34 +142,9 @@ export const Dashboard = () => {
       
       setMyProjects(updateProject(myProjects))
       setRecentProjects(updateProject(recentProjects))
-      
-      // If made public, it might appear in community
-      if (isPublic) {
-        loadCommunityProjects(true)
-      }
     }
     
     return { error }
-  }
-
-  const handleForkProject = async (projectId, title) => {
-    const newTitle = `${title} (Fork)`
-    const { data, error } = await projectService.forkProject(projectId, user.id, newTitle)
-    
-    if (!error && data) {
-      setForkedProjects([data, ...forkedProjects])
-      setRecentProjects([data, ...recentProjects.slice(0, 7)])
-      setSelectedCommunityProject(null)
-      // Refresh community to update fork counts
-      loadCommunityProjects(true)
-      return { data, error: null }
-    }
-    
-    return { data: null, error }
-  }
-
-  const handleCommunityProjectClick = (project) => {
-    setSelectedCommunityProject(project)
   }
 
   // Filter projects based on search
@@ -226,8 +155,6 @@ export const Dashboard = () => {
         return myProjects.filter(p => p.title.toLowerCase().includes(query))
       case TABS.FORKED:
         return forkedProjects.filter(p => p.title.toLowerCase().includes(query))
-      case TABS.COMMUNITY:
-        return communityProjects // Already filtered server-side
       default:
         return []
     }
@@ -239,7 +166,6 @@ export const Dashboard = () => {
   const tabCounts = {
     [TABS.MY_PROJECTS]: myProjects.length,
     [TABS.FORKED]: forkedProjects.length,
-    [TABS.COMMUNITY]: communityProjects.length,
   }
 
   return (
@@ -286,13 +212,29 @@ export const Dashboard = () => {
           />
         )}
 
+        {/* Community Banner Notice */}
+        <Link to="/community" style={communityBannerStyle}>
+          <div style={communityBannerContentStyle}>
+            <div style={communityBannerIconStyle}>
+              <Globe style={{ width: '20px', height: '20px', color: 'var(--color-primary-400)' }} />
+            </div>
+            <div style={communityBannerTextStyle}>
+              <span style={communityBannerTitleStyle}>Explore the Community</span>
+              <span style={communityBannerDescStyle}>Discover amazing projects built by developers worldwide</span>
+            </div>
+          </div>
+          <div style={communityBannerArrowStyle}>
+            <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary-400)' }}>View Community</span>
+            <ArrowRight style={{ width: '16px', height: '16px', color: 'var(--color-primary-400)' }} />
+          </div>
+        </Link>
+
         {/* Tab Navigation */}
         <div style={tabContainerStyle}>
           <div style={tabBarStyle}>
             {[
               { id: TABS.MY_PROJECTS, label: 'My Projects', icon: Folder },
               { id: TABS.FORKED, label: 'Forked', icon: GitFork },
-              { id: TABS.COMMUNITY, label: 'Community', icon: Users },
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -333,9 +275,7 @@ export const Dashboard = () => {
             <Search style={searchIconStyle} />
             <input
               type="text"
-              placeholder={activeTab === TABS.COMMUNITY 
-                ? "Search community projects..." 
-                : "Search your projects..."}
+              placeholder="Search your projects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={searchInputStyle}
@@ -359,54 +299,6 @@ export const Dashboard = () => {
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {/* Sort dropdown (Community tab only) */}
-            {activeTab === TABS.COMMUNITY && (
-              <div style={{ position: 'relative' }}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setShowSortDropdown(!showSortDropdown)
-                  }}
-                  style={sortButtonStyle}
-                >
-                  <ArrowUpDown style={{ width: '16px', height: '16px' }} />
-                  {sortBy === 'recent' && 'Recent'}
-                  {sortBy === 'popular' && 'Popular'}
-                  {sortBy === 'most_forked' && 'Most Forked'}
-                </button>
-                
-                {showSortDropdown && (
-                  <div style={sortDropdownStyle} onClick={e => e.stopPropagation()}>
-                    {[
-                      { value: 'recent', label: 'Most Recent', icon: Clock },
-                      { value: 'popular', label: 'Most Popular', icon: TrendingUp },
-                      { value: 'most_forked', label: 'Most Forked', icon: GitFork },
-                    ].map(({ value, label, icon: Icon }) => (
-                      <button
-                        key={value}
-                        onClick={() => {
-                          setSortBy(value)
-                          setShowSortDropdown(false)
-                        }}
-                        style={{
-                          ...sortOptionStyle,
-                          background: sortBy === value 
-                            ? 'rgba(59, 130, 246, 0.15)' 
-                            : 'transparent',
-                          color: sortBy === value 
-                            ? 'var(--color-primary-400)' 
-                            : 'var(--color-surface-300)',
-                        }}
-                      >
-                        <Icon style={{ width: '14px', height: '14px' }} />
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            
             {/* View mode toggle */}
             <div style={viewToggleContainerStyle}>
               <button
@@ -447,23 +339,12 @@ export const Dashboard = () => {
               searchQuery={searchQuery}
               onClearSearch={() => setSearchQuery('')}
             />
-          ) : activeTab === TABS.FORKED ? (
+          ) : (
             <ForkedProjectsContent
               projects={filteredProjects}
               viewMode={viewMode}
               onDelete={handleDeleteProject}
               onVisibilityToggle={handleVisibilityToggle}
-              searchQuery={searchQuery}
-              onClearSearch={() => setSearchQuery('')}
-            />
-          ) : (
-            <CommunityContent
-              projects={filteredProjects}
-              viewMode={viewMode}
-              onProjectClick={handleCommunityProjectClick}
-              onLoadMore={() => loadCommunityProjects(false)}
-              hasMore={hasMoreCommunity}
-              loading={communityLoading}
               searchQuery={searchQuery}
               onClearSearch={() => setSearchQuery('')}
             />
@@ -481,16 +362,6 @@ export const Dashboard = () => {
             setShowModal(false)
             setNewProjectTitle('')
           }}
-        />
-      )}
-
-      {/* Community Project View Modal */}
-      {selectedCommunityProject && (
-        <CommunityProjectView
-          project={selectedCommunityProject}
-          onClose={() => setSelectedCommunityProject(null)}
-          onFork={handleForkProject}
-          currentUserId={user.id}
         />
       )}
     </div>
@@ -581,7 +452,7 @@ const ForkedProjectsContent = ({ projects, viewMode, onDelete, onVisibilityToggl
       <EmptyState
         icon={GitFork}
         title="No forked projects"
-        description="Explore the community tab to discover and fork interesting projects"
+        description="Explore the community page to discover and fork interesting projects"
         actionLabel={null}
       />
     )
@@ -599,60 +470,6 @@ const ForkedProjectsContent = ({ projects, viewMode, onDelete, onVisibilityToggl
       onVisibilityToggle={onVisibilityToggle}
       showForkSource
     />
-  )
-}
-
-const CommunityContent = ({ projects, viewMode, onProjectClick, onLoadMore, hasMore, loading, searchQuery, onClearSearch }) => {
-  if (projects.length === 0 && !loading && !searchQuery) {
-    return (
-      <EmptyState
-        icon={Users}
-        title="No community projects yet"
-        description="Be the first to share your project with the community!"
-        actionLabel={null}
-      />
-    )
-  }
-
-  if (projects.length === 0 && !loading && searchQuery) {
-    return <NoResultsState searchQuery={searchQuery} onClear={onClearSearch} />
-  }
-
-  return (
-    <>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: viewMode === 'grid' 
-          ? 'repeat(auto-fill, minmax(300px, 1fr))' 
-          : '1fr',
-        gap: viewMode === 'grid' ? '24px' : '12px',
-      }}>
-        {projects.map((project, index) => (
-          <div 
-            key={project.id}
-            style={{ animation: `fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.03}s both` }}
-          >
-            <CommunityProjectCard
-              project={project}
-              onClick={() => onProjectClick(project)}
-              viewMode={viewMode}
-            />
-          </div>
-        ))}
-      </div>
-      
-      {hasMore && (
-        <div style={{ textAlign: 'center', marginTop: '40px' }}>
-          <button
-            onClick={onLoadMore}
-            disabled={loading}
-            style={loadMoreButtonStyle}
-          >
-            {loading ? 'Loading...' : 'Load More'}
-          </button>
-        </div>
-      )}
-    </>
   )
 }
 
@@ -836,6 +653,64 @@ const createButtonStyle = {
   cursor: 'pointer',
   transition: 'all 0.3s ease',
   boxShadow: '0 4px 14px rgba(59, 130, 246, 0.25)',
+}
+
+// Community Banner styles
+const communityBannerStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '20px',
+  padding: '18px 24px',
+  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
+  border: '1px solid rgba(59, 130, 246, 0.2)',
+  borderRadius: '16px',
+  marginBottom: '28px',
+  textDecoration: 'none',
+  transition: 'all 0.3s ease',
+  animation: 'fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both',
+}
+
+const communityBannerContentStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '16px',
+}
+
+const communityBannerIconStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '44px',
+  height: '44px',
+  background: 'rgba(59, 130, 246, 0.15)',
+  borderRadius: '12px',
+  border: '1px solid rgba(59, 130, 246, 0.2)',
+  flexShrink: 0,
+}
+
+const communityBannerTextStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px',
+}
+
+const communityBannerTitleStyle = {
+  fontSize: '16px',
+  fontWeight: 600,
+  color: '#ffffff',
+}
+
+const communityBannerDescStyle = {
+  fontSize: '14px',
+  color: 'var(--color-surface-400)',
+}
+
+const communityBannerArrowStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  flexShrink: 0,
 }
 
 // Recent Activity styles

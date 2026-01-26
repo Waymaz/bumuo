@@ -241,7 +241,7 @@ export const Landing = () => {
             <div style={navLinksStyle}>
               <a href="#features" style={navLinkStyle}>Features</a>
               <a href="#showcase" style={navLinkStyle}>Showcase</a>
-              <a href="#community" style={navLinkStyle}>Community</a>
+              <Link to="/community" style={navLinkStyle}>Community</Link>
             </div>
 
             {/* Auth Buttons */}
@@ -269,7 +269,7 @@ export const Landing = () => {
             <div style={mobileMenuStyle}>
               <a href="#features" style={mobileNavLinkStyle} onClick={() => setMobileMenuOpen(false)}>Features</a>
               <a href="#showcase" style={mobileNavLinkStyle} onClick={() => setMobileMenuOpen(false)}>Showcase</a>
-              <a href="#community" style={mobileNavLinkStyle} onClick={() => setMobileMenuOpen(false)}>Community</a>
+              <Link to="/community" style={mobileNavLinkStyle} onClick={() => setMobileMenuOpen(false)}>Community</Link>
               <div style={mobileDividerStyle} />
               <Link to="/login" style={mobileNavLinkStyle} onClick={() => setMobileMenuOpen(false)}>Sign In</Link>
               <Link to="/register" style={mobileSignupBtnStyle} onClick={() => setMobileMenuOpen(false)}>
