@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Mail, Lock, ArrowRight, Eye, EyeOff, CheckCircle, Loader2 } from 'lucide-react'
+import { Mail, Lock, ArrowRight, ArrowLeft, Eye, EyeOff, CheckCircle, Loader2 } from 'lucide-react'
 import bumuoLogo from '../assets/bumuo-logo.png'
 
 // Google Icon Component
@@ -41,7 +41,14 @@ export const Register = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate('/dashboard')
+      // Check for return path from playground
+      const returnTo = sessionStorage.getItem('bumuo_return_to')
+      if (returnTo) {
+        sessionStorage.removeItem('bumuo_return_to')
+        navigate(returnTo)
+      } else {
+        navigate('/dashboard')
+      }
     }
   }, [user, navigate])
 
@@ -94,7 +101,14 @@ export const Register = () => {
       setError(errorMap[signUpError.message] || signUpError.message)
       setLoading(false)
     } else {
-      navigate('/dashboard')
+      // Check for return path from playground
+      const returnTo = sessionStorage.getItem('bumuo_return_to')
+      if (returnTo) {
+        sessionStorage.removeItem('bumuo_return_to')
+        navigate(returnTo)
+      } else {
+        navigate('/dashboard')
+      }
     }
   }
 
@@ -188,6 +202,45 @@ export const Register = () => {
           }}
         />
       </div>
+      
+      {/* Back Button - Fixed top left (outside animated container) */}
+      <Link
+        to="/"
+        style={{
+          position: 'fixed',
+          top: '24px',
+          left: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '10px 16px',
+          background: 'rgba(15, 15, 23, 0.8)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '12px',
+          color: 'var(--color-surface-400)',
+          textDecoration: 'none',
+          fontWeight: 500,
+          fontSize: '14px',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          zIndex: 50,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(30, 30, 46, 0.9)'
+          e.currentTarget.style.color = '#ffffff'
+          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'rgba(15, 15, 23, 0.8)'
+          e.currentTarget.style.color = 'var(--color-surface-400)'
+          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+        }}
+      >
+        <ArrowLeft style={{ width: '18px', height: '18px' }} />
+        Back
+      </Link>
       
       <div 
         style={{

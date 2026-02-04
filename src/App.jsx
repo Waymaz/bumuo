@@ -8,6 +8,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Editor } from './pages/Editor'
 import { Share } from './pages/Share'
 import { Community } from './pages/Community'
+import { NotFound } from './pages/NotFound'
 
 function App() {
   return (
@@ -23,12 +24,17 @@ function App() {
               <Dashboard />
             </ProtectedRoute>
           } />
+          {/* Playground route - accessible without authentication */}
+          <Route path="/editor/playground" element={<Editor />} />
+          {/* Regular editor route - requires authentication */}
           <Route path="/editor/:id" element={
             <ProtectedRoute>
               <Editor />
             </ProtectedRoute>
           } />
           <Route path="/share/:publicLink" element={<Share />} />
+          {/* 404 catch-all route */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { 
   Plus, Search, Grid3X3, List, Folder, ChevronRight, ChevronDown,
-  Sparkles, TrendingUp, GitFork, Clock, Users, X, ArrowUpDown, ArrowRight, Globe
+  Sparkles, TrendingUp, GitFork, Clock, Users, X, ArrowUpDown, ArrowRight, Globe, Trash2, Play
 } from 'lucide-react'
 import { Navbar } from '../components/Navbar'
 import { ProjectCard } from '../components/ProjectCard'
@@ -17,6 +17,7 @@ const TABS = {
 
 export const Dashboard = () => {
   const { user, profile, needsUsername } = useAuth()
+  const navigate = useNavigate()
   
   // Main state
   const [activeTab, setActiveTab] = useState(TABS.MY_PROJECTS)
@@ -37,6 +38,8 @@ export const Dashboard = () => {
     return localStorage.getItem('bumuo-recent-collapsed') === 'true'
   })
   const [showSortDropdown, setShowSortDropdown] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, projectId: null, projectTitle: '' })
+  const [deleting, setDeleting] = useState(false)
   
   // Tab indicator animation
   const tabRefs = useRef({})
@@ -120,16 +123,24 @@ export const Dashboard = () => {
     }
   }
 
-  const handleDeleteProject = async (id) => {
-    if (!confirm('Are you sure you want to delete this project? This action cannot be undone.')) return
+  const handleDeleteProject = (id, title) => {
+    setDeleteConfirm({ show: true, projectId: id, projectTitle: title })
+  }
 
-    const { error } = await projectService.deleteProject(id)
+  const confirmDelete = async () => {
+    if (!deleteConfirm.projectId) return
+    
+    setDeleting(true)
+    const { error } = await projectService.deleteProject(deleteConfirm.projectId)
     
     if (!error) {
-      setMyProjects(myProjects.filter(p => p.id !== id))
-      setForkedProjects(forkedProjects.filter(p => p.id !== id))
-      setRecentProjects(recentProjects.filter(p => p.id !== id))
+      setMyProjects(myProjects.filter(p => p.id !== deleteConfirm.projectId))
+      setForkedProjects(forkedProjects.filter(p => p.id !== deleteConfirm.projectId))
+      setRecentProjects(recentProjects.filter(p => p.id !== deleteConfirm.projectId))
     }
+    
+    setDeleting(false)
+    setDeleteConfirm({ show: false, projectId: null, projectTitle: '' })
   }
 
   const handleVisibilityToggle = async (id, isPublic) => {
@@ -228,6 +239,34 @@ export const Dashboard = () => {
             <ArrowRight style={{ width: '16px', height: '16px', color: 'var(--color-primary-400)' }} />
           </div>
         </Link>
+
+        {/* Try for Free Banner - Opens playground editor */}
+        <div 
+          onClick={() => navigate('/editor/playground')} 
+          style={tryFreeBannerStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)'
+            e.currentTarget.style.boxShadow = '0 8px 32px rgba(139, 92, 246, 0.15)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.2)'
+            e.currentTarget.style.boxShadow = 'none'
+          }}
+        >
+          <div style={tryFreeBannerContentStyle}>
+            <div style={tryFreeBannerIconStyle}>
+              <Play style={{ width: '20px', height: '20px', color: '#a78bfa' }} />
+            </div>
+            <div style={communityBannerTextStyle}>
+              <span style={tryFreeBannerTitleStyle}>Try the Playground</span>
+              <span style={tryFreeBannerDescStyle}>Start coding instantly — no signup required</span>
+            </div>
+          </div>
+          <div style={communityBannerArrowStyle}>
+            <span style={{ fontSize: '14px', fontWeight: 500, color: '#a78bfa' }}>Open Editor</span>
+            <ArrowRight style={{ width: '16px', height: '16px', color: '#a78bfa' }} />
+          </div>
+        </div>
 
         {/* Tab Navigation */}
         <div style={tabContainerStyle}>
@@ -362,6 +401,16 @@ export const Dashboard = () => {
             setShowModal(false)
             setNewProjectTitle('')
           }}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.show && (
+        <DeleteConfirmModal
+          projectTitle={deleteConfirm.projectTitle}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteConfirm({ show: false, projectId: null, projectTitle: '' })}
+          isDeleting={deleting}
         />
       )}
     </div>
@@ -611,6 +660,103 @@ const CreateProjectModal = ({ title, onTitleChange, onSubmit, onClose }) => (
   </div>
 )
 
+const DeleteConfirmModal = ({ projectTitle, onConfirm, onCancel, isDeleting }) => (
+  <div 
+    style={modalOverlayStyle}
+    onClick={(e) => e.target === e.currentTarget && !isDeleting && onCancel()}
+  >
+    <div style={modalContentStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
+        <div style={{ 
+          ...modalIconStyle, 
+          background: 'rgba(244, 63, 94, 0.15)', 
+          border: '1px solid rgba(244, 63, 94, 0.2)' 
+        }}>
+          <Trash2 style={{ width: '24px', height: '24px', color: '#fb7185' }} />
+        </div>
+        <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+          Delete Project
+        </h2>
+      </div>
+      
+      <p style={{ 
+        color: 'var(--color-surface-400)', 
+        fontSize: '15px', 
+        lineHeight: 1.6,
+        marginBottom: '8px' 
+      }}>
+        Are you sure you want to delete{' '}
+        <span style={{ color: '#ffffff', fontWeight: 600 }}>"{projectTitle}"</span>?
+      </p>
+      <p style={{ 
+        color: 'var(--color-surface-500)', 
+        fontSize: '14px', 
+        marginBottom: '28px' 
+      }}>
+        This action cannot be undone. All code and settings will be permanently removed.
+      </p>
+      
+      <div style={{ display: 'flex', gap: '12px' }}>
+        <button 
+          type="button" 
+          onClick={onCancel} 
+          disabled={isDeleting}
+          style={{
+            ...modalCancelBtnStyle,
+            opacity: isDeleting ? 0.5 : 1,
+            cursor: isDeleting ? 'not-allowed' : 'pointer',
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={isDeleting}
+          style={{
+            flex: 1,
+            padding: '14px',
+            background: isDeleting 
+              ? 'rgba(244, 63, 94, 0.5)' 
+              : 'linear-gradient(135deg, #e11d48 0%, #f43f5e 100%)',
+            border: 'none',
+            borderRadius: '12px',
+            color: '#ffffff',
+            fontWeight: 600,
+            fontSize: '15px',
+            cursor: isDeleting ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: isDeleting ? 'none' : '0 4px 14px rgba(244, 63, 94, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          {isDeleting ? (
+            <>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: '2px solid rgba(255,255,255,0.3)',
+                borderTopColor: '#ffffff',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+              }} />
+              Deleting...
+            </>
+          ) : (
+            <>
+              <Trash2 style={{ width: '16px', height: '16px' }} />
+              Delete Project
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  </div>
+)
+
 // ============================================
 // STYLES
 // ============================================
@@ -711,6 +857,51 @@ const communityBannerArrowStyle = {
   alignItems: 'center',
   gap: '8px',
   flexShrink: 0,
+}
+
+// Try for Free Banner styles
+const tryFreeBannerStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '20px',
+  padding: '18px 24px',
+  background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%)',
+  border: '1px solid rgba(139, 92, 246, 0.2)',
+  borderRadius: '16px',
+  marginBottom: '28px',
+  cursor: 'pointer',
+  transition: 'all 0.3s ease',
+  animation: 'fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both',
+}
+
+const tryFreeBannerContentStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '16px',
+}
+
+const tryFreeBannerIconStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '44px',
+  height: '44px',
+  background: 'rgba(139, 92, 246, 0.15)',
+  borderRadius: '12px',
+  border: '1px solid rgba(139, 92, 246, 0.2)',
+  flexShrink: 0,
+}
+
+const tryFreeBannerTitleStyle = {
+  fontSize: '16px',
+  fontWeight: 600,
+  color: '#ffffff',
+}
+
+const tryFreeBannerDescStyle = {
+  fontSize: '14px',
+  color: 'var(--color-surface-400)',
 }
 
 // Recent Activity styles

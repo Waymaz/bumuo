@@ -24,7 +24,7 @@ export const ProjectCard = ({ project, onDelete, viewMode = 'grid', showVisibili
   const handleDelete = (e) => {
     e.stopPropagation()
     setShowMenu(false)
-    onDelete(project.id)
+    onDelete(project.id, project.title)
   }
 
   if (viewMode === 'list') {

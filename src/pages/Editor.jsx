@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { 
   Save, Share2, ArrowLeft, Play, Sparkles, Code, Palette, Zap,
   PanelLeft, PanelRight, PanelBottom, EyeOff, Eye, Maximize2, Minimize2,
   RefreshCw, Settings, ChevronDown, Monitor, Tablet, Smartphone, GripVertical,
-  Globe, Lock
+  Globe, Lock, UserPlus, LogIn, X, AlertCircle
 } from 'lucide-react'
 import { Navbar } from '../components/Navbar'
 import { CodeEditor } from '../components/CodeEditor'
@@ -85,6 +85,7 @@ const useResizable = (initialSizes, direction = 'vertical') => {
 export const Editor = () => {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
   const [project, setProject] = useState(null)
   const [html, setHtml] = useState('')
@@ -98,6 +99,11 @@ export const Editor = () => {
   const [isPublic, setIsPublic] = useState(false)
   const [showPublicConfirm, setShowPublicConfirm] = useState(false)
   const [togglingVisibility, setTogglingVisibility] = useState(false)
+  const [showSavePrompt, setShowSavePrompt] = useState(false)
+  
+  // Playground mode - for non-logged in users (check pathname since route has no :id param)
+  const isPlayground = location.pathname === '/editor/playground'
+  const [playgroundSource, setPlaygroundSource] = useState(null)
   
   // Layout controls
   const [previewPosition, setPreviewPosition] = useState('right') // 'right', 'left', 'bottom', 'hidden'
@@ -177,7 +183,7 @@ export const Editor = () => {
 
   useEffect(() => {
     loadProject()
-  }, [id])
+  }, [id, location.pathname])
 
   useEffect(() => {
     if (autoRun) {
@@ -203,7 +209,11 @@ export const Editor = () => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
-        handleSave()
+        if (isPlayground && !user) {
+          setShowSavePrompt(true)
+        } else {
+          handleSave()
+        }
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault()
@@ -212,9 +222,41 @@ export const Editor = () => {
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [title, html, css, js])
+  }, [title, html, css, js, isPlayground, user])
 
   const loadProject = async () => {
+    // Handle playground mode for non-logged in users
+    if (isPlayground) {
+      const tempProject = sessionStorage.getItem('bumuo_temp_project')
+      if (tempProject) {
+        try {
+          const data = JSON.parse(tempProject)
+          setPlaygroundSource(data)
+          setProject({ id: 'playground', title: data.title })
+          setTitle(data.title || 'Playground')
+          setHtml(data.html || '')
+          setCss(data.css || '')
+          setJs(data.js || '')
+          return
+        } catch (e) {
+          console.error('Failed to parse temp project:', e)
+        }
+      }
+      // No temp project, create empty playground
+      setProject({ id: 'playground', title: 'Playground' })
+      setTitle('Playground')
+      setHtml('<h1>Hello, World!</h1>\n<p>Start coding here...</p>')
+      setCss('body {\n  font-family: system-ui, sans-serif;\n  padding: 20px;\n}')
+      setJs('// Your JavaScript here')
+      return
+    }
+
+    // Regular project loading for logged-in users
+    if (!user) {
+      navigate('/login')
+      return
+    }
+
     const { data, error } = await projectService.getProject(id)
     
     if (!error && data) {
@@ -257,6 +299,24 @@ export const Editor = () => {
   }
 
   const handleSave = async () => {
+    // Show save prompt for playground mode without user
+    if (isPlayground && !user) {
+      setShowSavePrompt(true)
+      return
+    }
+    
+    // For playground mode with logged-in user, create a new project
+    if (isPlayground && user) {
+      setSaving(true)
+      const { data, error } = await projectService.createProject(user.id, title, html, css, js)
+      if (!error && data) {
+        // Navigate to the new project
+        navigate(`/editor/${data.id}`, { replace: true })
+      }
+      setSaving(false)
+      return
+    }
+    
     setSaving(true)
     
     await projectService.updateProject(id, {
@@ -347,7 +407,14 @@ export const Editor = () => {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => {
+              if (isPlayground) {
+                // Go back to community or landing page
+                navigate('/community')
+              } else {
+                navigate('/dashboard')
+              }
+            }}
             style={{
               padding: '10px',
               color: 'var(--color-surface-400)',
@@ -365,7 +432,7 @@ export const Editor = () => {
               e.currentTarget.style.color = 'var(--color-surface-400)'
               e.currentTarget.style.background = 'transparent'
             }}
-            title="Back to Dashboard"
+            title={isPlayground ? "Back to Community" : "Back to Dashboard"}
           >
             <ArrowLeft style={{ width: '20px', height: '20px' }} />
           </button>
@@ -639,59 +706,71 @@ export const Editor = () => {
             </button>
           )}
           
-          {/* Share button */}
-          <button
-            onClick={handleShare}
-            style={{
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 16px',
-              background: 'var(--color-surface-700)',
-              color: 'var(--color-surface-300)',
-              border: '1px solid rgba(255, 255, 255, 0.06)',
-              borderRadius: '12px',
-              fontWeight: 500,
-              fontSize: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--color-surface-600)'
-              e.currentTarget.style.color = '#ffffff'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--color-surface-700)'
-              e.currentTarget.style.color = 'var(--color-surface-300)'
-            }}
-            title="Share Project"
-          >
-            <Share2 style={{ width: '16px', height: '16px' }} />
-            <span className="hidden-mobile">{shareSuccess ? 'Copied!' : 'Share'}</span>
-            {shareSuccess && (
-              <div 
-                style={{
-                  position: 'absolute',
-                  top: '-4px',
-                  right: '-4px',
-                  width: '10px',
-                  height: '10px',
-                  background: '#34d399',
-                  borderRadius: '50%',
-                  animation: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite',
-                }}
-              />
-            )}
-          </button>
+          {/* Share button - hidden in playground mode without user */}
+          {(!isPlayground || user) && (
+            <button
+              onClick={handleShare}
+              style={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 16px',
+                background: 'var(--color-surface-700)',
+                color: 'var(--color-surface-300)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '12px',
+                fontWeight: 500,
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--color-surface-600)'
+                e.currentTarget.style.color = '#ffffff'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'var(--color-surface-700)'
+                e.currentTarget.style.color = 'var(--color-surface-300)'
+              }}
+              title="Share Project"
+            >
+              <Share2 style={{ width: '16px', height: '16px' }} />
+              <span className="hidden-mobile">{shareSuccess ? 'Copied!' : 'Share'}</span>
+              {shareSuccess && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    width: '10px',
+                    height: '10px',
+                    background: '#34d399',
+                    borderRadius: '50%',
+                    animation: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite',
+                  }}
+                />
+              )}
+            </button>
+          )}
           
-          {/* Visibility Toggle */}
-          <VisibilityToggle 
-            isPublic={isPublic}
-            onToggle={handleToggleVisibility}
-            disabled={togglingVisibility}
-            variant="compact"
-          />
+          {/* Visibility Toggle - hidden in playground mode */}
+          {!isPlayground && (
+            <VisibilityToggle 
+              isPublic={isPublic}
+              onToggle={handleToggleVisibility}
+              disabled={togglingVisibility}
+              variant="compact"
+            />
+          )}
+          
+          {/* Playground Mode Banner */}
+          {isPlayground && !user && (
+            <div style={playgroundBannerStyle}>
+              <AlertCircle style={{ width: '16px', height: '16px', color: '#fbbf24' }} />
+              <span>Playground Mode</span>
+            </div>
+          )}
           
           {/* Save button */}
           <button
@@ -704,7 +783,9 @@ export const Editor = () => {
               padding: '10px 20px',
               background: saving 
                 ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
-                : 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%)',
+                : isPlayground && !user
+                  ? 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)'
+                  : 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%)',
               color: '#ffffff',
               border: 'none',
               borderRadius: '12px',
@@ -712,12 +793,23 @@ export const Editor = () => {
               fontSize: '14px',
               cursor: saving ? 'default' : 'pointer',
               transition: 'all 0.2s ease',
-              boxShadow: '0 4px 14px rgba(59, 130, 246, 0.25)',
+              boxShadow: isPlayground && !user 
+                ? '0 4px 14px rgba(139, 92, 246, 0.25)'
+                : '0 4px 14px rgba(59, 130, 246, 0.25)',
             }}
-            title="Save Project (Ctrl+S)"
+            title={isPlayground && !user ? "Sign up to save" : "Save Project (Ctrl+S)"}
           >
-            <Save style={{ width: '16px', height: '16px', ...(saving ? { animation: 'pulse 1s ease-in-out infinite' } : {}) }} />
-            <span className="hidden-mobile">{saving ? 'Saved!' : 'Save'}</span>
+            {isPlayground && !user ? (
+              <>
+                <UserPlus style={{ width: '16px', height: '16px' }} />
+                <span className="hidden-mobile">Sign Up to Save</span>
+              </>
+            ) : (
+              <>
+                <Save style={{ width: '16px', height: '16px', ...(saving ? { animation: 'pulse 1s ease-in-out infinite' } : {}) }} />
+                <span className="hidden-mobile">{saving ? 'Saved!' : 'Save'}</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -1095,6 +1187,33 @@ export const Editor = () => {
         />
       )}
 
+      {/* Save Prompt for Playground Mode */}
+      {showSavePrompt && (
+        <SavePromptModal
+          onClose={() => setShowSavePrompt(false)}
+          onLogin={() => {
+            sessionStorage.setItem('bumuo_return_to', '/editor/playground')
+            sessionStorage.setItem('bumuo_temp_project', JSON.stringify({
+              title,
+              html,
+              css,
+              js,
+            }))
+            navigate('/login')
+          }}
+          onSignUp={() => {
+            sessionStorage.setItem('bumuo_return_to', '/editor/playground')
+            sessionStorage.setItem('bumuo_temp_project', JSON.stringify({
+              title,
+              html,
+              css,
+              js,
+            }))
+            navigate('/register')
+          }}
+        />
+      )}
+
       {/* Responsive CSS */}
       <style>{`
         @media (min-width: 1024px) {
@@ -1370,3 +1489,213 @@ const ResizeHandle = ({ direction, onMouseDown }) => {
     </div>
   )
 }
+
+// Playground Banner Style
+const playgroundBannerStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  padding: '8px 14px',
+  background: 'rgba(251, 191, 36, 0.1)',
+  border: '1px solid rgba(251, 191, 36, 0.2)',
+  borderRadius: '10px',
+  fontSize: '13px',
+  fontWeight: 500,
+  color: '#fbbf24',
+}
+
+// Save Prompt Modal Component
+const SavePromptModal = ({ onClose, onLogin, onSignUp }) => (
+  <div 
+    style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0, 0, 0, 0.7)',
+      backdropFilter: 'blur(8px)',
+      WebkitBackdropFilter: 'blur(8px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 200,
+      animation: 'fade-in 0.2s ease',
+    }}
+    onClick={(e) => e.target === e.currentTarget && onClose()}
+  >
+    <div 
+      style={{
+        position: 'relative',
+        background: 'var(--color-surface-900)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: '24px',
+        padding: '40px',
+        maxWidth: '420px',
+        width: '90%',
+        textAlign: 'center',
+        boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5)',
+        animation: 'scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+      }}
+    >
+      {/* Icon */}
+      <div 
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '64px',
+          height: '64px',
+          background: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
+          borderRadius: '20px',
+          marginBottom: '20px',
+          boxShadow: '0 8px 24px rgba(139, 92, 246, 0.3)',
+        }}
+      >
+        <Save style={{ width: '28px', height: '28px', color: '#ffffff' }} />
+      </div>
+      
+      {/* Content */}
+      <h3 
+        style={{
+          fontSize: '24px',
+          fontWeight: 700,
+          color: '#ffffff',
+          marginBottom: '12px',
+          letterSpacing: '-0.02em',
+        }}
+      >
+        Save Your Work
+      </h3>
+      <p 
+        style={{
+          fontSize: '15px',
+          color: 'var(--color-surface-400)',
+          lineHeight: 1.6,
+          marginBottom: '24px',
+        }}
+      >
+        Create a free account to save your project, access it from anywhere, and share with the community.
+      </p>
+      
+      {/* Features */}
+      <div 
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          marginBottom: '28px',
+          padding: '20px',
+          background: 'rgba(139, 92, 246, 0.05)',
+          borderRadius: '16px',
+          border: '1px solid rgba(139, 92, 246, 0.1)',
+        }}
+      >
+        {[
+          'Your code is preserved when you sign up',
+          'Access your projects from any device',
+          'Share your creations with others',
+        ].map((text, i) => (
+          <div 
+            key={i}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              fontSize: '14px',
+              color: 'var(--color-surface-300)',
+              textAlign: 'left',
+            }}
+          >
+            <div 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '20px',
+                height: '20px',
+                background: 'rgba(16, 185, 129, 0.2)',
+                borderRadius: '6px',
+                fontSize: '12px',
+                color: '#10b981',
+                fontWeight: 600,
+                flexShrink: 0,
+              }}
+            >
+              ✓
+            </div>
+            <span>{text}</span>
+          </div>
+        ))}
+      </div>
+      
+      {/* Actions */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <button 
+          onClick={onSignUp}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            width: '100%',
+            padding: '14px 24px',
+            background: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
+            border: 'none',
+            borderRadius: '14px',
+            color: '#ffffff',
+            fontWeight: 600,
+            fontSize: '15px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 4px 14px rgba(139, 92, 246, 0.3)',
+          }}
+        >
+          <UserPlus style={{ width: '18px', height: '18px' }} />
+          Create Free Account
+        </button>
+        <button 
+          onClick={onLogin}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            width: '100%',
+            padding: '14px 24px',
+            background: 'var(--color-surface-800)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '14px',
+            color: 'var(--color-surface-300)',
+            fontWeight: 500,
+            fontSize: '15px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <LogIn style={{ width: '18px', height: '18px' }} />
+          Sign In
+        </button>
+      </div>
+      
+      {/* Close button */}
+      <button 
+        onClick={onClose}
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          padding: '8px',
+          background: 'var(--color-surface-800)',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
+          borderRadius: '10px',
+          color: 'var(--color-surface-400)',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <X style={{ width: '18px', height: '18px' }} />
+      </button>
+    </div>
+  </div>
+)

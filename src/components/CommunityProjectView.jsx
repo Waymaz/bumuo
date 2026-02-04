@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { 
   X, GitFork, Eye, Clock, ArrowLeft, Code, Loader2,
-  FileCode, FileType, Braces 
+  FileCode, FileType, Braces, UserPlus, LogIn
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { projectService } from '../services/projectService'
@@ -13,9 +13,11 @@ export const CommunityProjectView = ({ project, onClose, onFork, currentUserId }
   const [forking, setForking] = useState(false)
   const [forkSuccess, setForkSuccess] = useState(false)
   const [forkedProject, setForkedProject] = useState(null)
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false)
 
   const creator = project.creator || {}
   const avatarUrl = creator.avatar_url || profileService.generateAvatarUrl(creator.username || 'user')
+  const isLoggedIn = !!currentUserId
 
   // Record view when modal opens
   useEffect(() => {
@@ -40,6 +42,21 @@ export const CommunityProjectView = ({ project, onClose, onFork, currentUserId }
 
   const handleFork = async () => {
     if (forking) return
+    
+    // For non-logged in users, open project in editor playground
+    if (!isLoggedIn) {
+      sessionStorage.setItem('bumuo_temp_project', JSON.stringify({
+        title: `Fork of ${project.title}`,
+        html: project.html || '',
+        css: project.css || '',
+        js: project.js || '',
+        originalId: project.id,
+        creatorName: creator.username || 'user'
+      }))
+      navigate('/editor/playground')
+      onClose()
+      return
+    }
     
     setForking(true)
     const { data, error } = await onFork(project.id, project.title)
@@ -76,36 +93,54 @@ export const CommunityProjectView = ({ project, onClose, onFork, currentUserId }
         <div style={headerStyle}>
           <button onClick={onClose} style={backButtonStyle}>
             <ArrowLeft style={{ width: '18px', height: '18px' }} />
-            Back to Community
+            <span style={{ display: 'inline-block' }}>Back</span>
           </button>
           
-          {!isOwner && !forkSuccess && (
-            <button
-              onClick={handleFork}
-              disabled={forking}
-              style={forkButtonStyle}
-            >
-              {forking ? (
-                <>
-                  <Loader2 style={{ width: '18px', height: '18px', animation: 'spin 1s linear infinite' }} />
-                  Forking...
-                </>
-              ) : (
-                <>
-                  <GitFork style={{ width: '18px', height: '18px' }} />
-                  Fork Project
-                </>
-              )}
-            </button>
-          )}
-          
-          {forkSuccess && (
-            <button onClick={handleOpenForked} style={openForkedButtonStyle}>
-              <Code style={{ width: '18px', height: '18px' }} />
-              Open Forked Project
-            </button>
-          )}
+          <div style={headerActionsStyle}>
+            {/* Fork button - different states based on auth and ownership */}
+            {!isOwner && !forkSuccess && (
+              <button
+                onClick={handleFork}
+                disabled={forking}
+                style={forkButtonStyle}
+              >
+                {forking ? (
+                  <>
+                    <Loader2 style={{ width: '18px', height: '18px', animation: 'spin 1s linear infinite' }} />
+                    <span>Forking...</span>
+                  </>
+                ) : (
+                  <>
+                    <GitFork style={{ width: '18px', height: '18px' }} />
+                    <span>{isLoggedIn ? 'Fork Project' : 'Fork to Edit'}</span>
+                  </>
+                )}
+              </button>
+            )}
+            
+            {forkSuccess && (
+              <button onClick={handleOpenForked} style={openForkedButtonStyle}>
+                <Code style={{ width: '18px', height: '18px' }} />
+                <span>Open Forked Project</span>
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Auth Prompt Modal for non-logged in users */}
+        {showAuthPrompt && (
+          <AuthPromptModal 
+            onClose={() => setShowAuthPrompt(false)}
+            onLogin={() => {
+              sessionStorage.setItem('bumuo_return_to', window.location.pathname)
+              navigate('/login')
+            }}
+            onSignUp={() => {
+              sessionStorage.setItem('bumuo_return_to', window.location.pathname)
+              navigate('/register')
+            }}
+          />
+        )}
 
         {/* Project Info */}
         <div style={projectInfoStyle}>
@@ -225,11 +260,6 @@ export const CommunityProjectView = ({ project, onClose, onFork, currentUserId }
             )}
           </div>
         </div>
-
-        {/* Close button */}
-        <button onClick={onClose} style={closeButtonStyle}>
-          <X style={{ width: '20px', height: '20px' }} />
-        </button>
       </div>
     </div>
   )
@@ -473,10 +503,200 @@ const emptyCodeStyle = {
   textAlign: 'center',
 }
 
-const closeButtonStyle = {
+// Header actions style
+const headerActionsStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  flexWrap: 'wrap',
+}
+
+// Auth Prompt Modal Component
+const AuthPromptModal = ({ onClose, onLogin, onSignUp }) => (
+  <div style={authPromptOverlayStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div style={authPromptModalStyle}>
+      {/* Icon */}
+      <div style={authPromptIconStyle}>
+        <UserPlus style={{ width: '28px', height: '28px', color: '#ffffff' }} />
+      </div>
+      
+      {/* Content */}
+      <h3 style={authPromptTitleStyle}>
+        Create an Account to Save
+      </h3>
+      <p style={authPromptDescStyle}>
+        Sign up for free to fork projects, save your work, and share with the community.
+      </p>
+      
+      {/* Benefits list */}
+      <div style={authPromptBenefitsStyle}>
+        <div style={authPromptBenefitItemStyle}>
+          <div style={authPromptCheckStyle}>✓</div>
+          <span>Save and manage unlimited projects</span>
+        </div>
+        <div style={authPromptBenefitItemStyle}>
+          <div style={authPromptCheckStyle}>✓</div>
+          <span>Fork and customize community projects</span>
+        </div>
+        <div style={authPromptBenefitItemStyle}>
+          <div style={authPromptCheckStyle}>✓</div>
+          <span>Share your creations with others</span>
+        </div>
+      </div>
+      
+      {/* Actions */}
+      <div style={authPromptActionsStyle}>
+        <button onClick={onSignUp} style={authPromptSignUpBtnStyle}>
+          <UserPlus style={{ width: '18px', height: '18px' }} />
+          Create Free Account
+        </button>
+        <button onClick={onLogin} style={authPromptLoginBtnStyle}>
+          <LogIn style={{ width: '18px', height: '18px' }} />
+          Sign In
+        </button>
+      </div>
+      
+      {/* Close button */}
+      <button onClick={onClose} style={authPromptCloseBtnStyle}>
+        <X style={{ width: '18px', height: '18px' }} />
+      </button>
+    </div>
+  </div>
+)
+
+// Auth Prompt Modal Styles
+const authPromptOverlayStyle = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0, 0, 0, 0.7)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 200,
+  animation: 'fade-in 0.2s ease',
+}
+
+const authPromptModalStyle = {
+  position: 'relative',
+  background: 'var(--color-surface-900)',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  borderRadius: '24px',
+  padding: '40px',
+  maxWidth: '420px',
+  width: '90%',
+  textAlign: 'center',
+  boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5)',
+  animation: 'scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+}
+
+const authPromptIconStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '64px',
+  height: '64px',
+  background: 'linear-gradient(135deg, var(--color-primary-600) 0%, #8b5cf6 100%)',
+  borderRadius: '20px',
+  marginBottom: '20px',
+  boxShadow: '0 8px 24px rgba(59, 130, 246, 0.3)',
+}
+
+const authPromptTitleStyle = {
+  fontSize: '24px',
+  fontWeight: 700,
+  color: '#ffffff',
+  marginBottom: '12px',
+  letterSpacing: '-0.02em',
+}
+
+const authPromptDescStyle = {
+  fontSize: '15px',
+  color: 'var(--color-surface-400)',
+  lineHeight: 1.6,
+  marginBottom: '24px',
+}
+
+const authPromptBenefitsStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px',
+  marginBottom: '28px',
+  padding: '20px',
+  background: 'rgba(59, 130, 246, 0.05)',
+  borderRadius: '16px',
+  border: '1px solid rgba(59, 130, 246, 0.1)',
+}
+
+const authPromptBenefitItemStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  fontSize: '14px',
+  color: 'var(--color-surface-300)',
+  textAlign: 'left',
+}
+
+const authPromptCheckStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '20px',
+  height: '20px',
+  background: 'rgba(16, 185, 129, 0.2)',
+  borderRadius: '6px',
+  fontSize: '12px',
+  color: '#10b981',
+  fontWeight: 600,
+  flexShrink: 0,
+}
+
+const authPromptActionsStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px',
+}
+
+const authPromptSignUpBtnStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '10px',
+  width: '100%',
+  padding: '14px 24px',
+  background: 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%)',
+  border: 'none',
+  borderRadius: '14px',
+  color: '#ffffff',
+  fontWeight: 600,
+  fontSize: '15px',
+  cursor: 'pointer',
+  transition: 'all 0.2s ease',
+  boxShadow: '0 4px 14px rgba(59, 130, 246, 0.3)',
+}
+
+const authPromptLoginBtnStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '10px',
+  width: '100%',
+  padding: '14px 24px',
+  background: 'var(--color-surface-800)',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
+  borderRadius: '14px',
+  color: 'var(--color-surface-300)',
+  fontWeight: 500,
+  fontSize: '15px',
+  cursor: 'pointer',
+  transition: 'all 0.2s ease',
+}
+
+const authPromptCloseBtnStyle = {
   position: 'absolute',
-  top: '20px',
-  right: '20px',
+  top: '16px',
+  right: '16px',
   padding: '8px',
   background: 'var(--color-surface-800)',
   border: '1px solid rgba(255, 255, 255, 0.06)',

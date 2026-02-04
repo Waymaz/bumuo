@@ -305,14 +305,14 @@ export const Landing = () => {
 
           {/* CTA Buttons */}
           <div style={heroCTAStyle}>
-            <Link to="/register" style={primaryCTAStyle}>
+            <Link to="/editor/playground" style={primaryCTAStyle}>
               Start Creating Free
               <ArrowRight size={18} />
             </Link>
-            <a href="#showcase" style={secondaryCTAStyle}>
+            <Link to="/editor/playground" style={secondaryCTAStyle}>
               <Play size={18} style={{ marginRight: '8px' }} />
-              See It In Action
-            </a>
+              Try the Editor
+            </Link>
           </div>
 
           {/* Hero Terminal */}
