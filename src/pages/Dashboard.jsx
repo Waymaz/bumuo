@@ -240,34 +240,6 @@ export const Dashboard = () => {
           </div>
         </Link>
 
-        {/* Try for Free Banner - Opens playground editor */}
-        <div 
-          onClick={() => navigate('/editor/playground')} 
-          style={tryFreeBannerStyle}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)'
-            e.currentTarget.style.boxShadow = '0 8px 32px rgba(139, 92, 246, 0.15)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.2)'
-            e.currentTarget.style.boxShadow = 'none'
-          }}
-        >
-          <div style={tryFreeBannerContentStyle}>
-            <div style={tryFreeBannerIconStyle}>
-              <Play style={{ width: '20px', height: '20px', color: '#a78bfa' }} />
-            </div>
-            <div style={communityBannerTextStyle}>
-              <span style={tryFreeBannerTitleStyle}>Try the Playground</span>
-              <span style={tryFreeBannerDescStyle}>Start coding instantly — no signup required</span>
-            </div>
-          </div>
-          <div style={communityBannerArrowStyle}>
-            <span style={{ fontSize: '14px', fontWeight: 500, color: '#a78bfa' }}>Open Editor</span>
-            <ArrowRight style={{ width: '16px', height: '16px', color: '#a78bfa' }} />
-          </div>
-        </div>
-
         {/* Tab Navigation */}
         <div style={tabContainerStyle}>
           <div style={tabBarStyle}>

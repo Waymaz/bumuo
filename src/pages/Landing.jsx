@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { 
@@ -17,13 +17,24 @@ export const Landing = () => {
   const [currentLine, setCurrentLine] = useState(0)
   const [currentChar, setCurrentChar] = useState(0)
   const [activeTab, setActiveTab] = useState('html')
-  const [magicActive, setMagicActive] = useState(false)
-  const [clickCount, setClickCount] = useState(0)
   const [globeVisible, setGlobeVisible] = useState(false)
   const [orbitAngle, setOrbitAngle] = useState(0)
+  
+  // Snake Game State
+  const [gameStarted, setGameStarted] = useState(false)
+  const [gameOver, setGameOver] = useState(false)
+  const [score, setScore] = useState(0)
+  const [highScore, setHighScore] = useState(0)
+  const [snake, setSnake] = useState([{ x: 10, y: 10 }])
+  const [food, setFood] = useState({ x: 15, y: 10 })
+  const [direction, setDirection] = useState({ x: 0, y: 0 })
+  const gameLoopRef = useRef(null)
+  const directionRef = useRef({ x: 0, y: 0 })
+  
   const heroRef = useRef(null)
   const communityRef = useRef(null)
   const orbitAnimationRef = useRef(null)
+  const gameContainerRef = useRef(null)
 
   // Redirect if already logged in
   useEffect(() => {
@@ -145,6 +156,286 @@ export const Landing = () => {
       return () => clearTimeout(timer)
     }
   }, [currentLine, currentChar])
+
+  // Snake Game Constants
+  const GRID_SIZE = 20
+  const CELL_SIZE = 15
+  const GAME_SPEED = 120
+
+  // Generate random food position
+  const generateFood = useCallback((currentSnake) => {
+    let newFood
+    do {
+      newFood = {
+        x: Math.floor(Math.random() * GRID_SIZE),
+        y: Math.floor(Math.random() * GRID_SIZE)
+      }
+    } while (currentSnake.some(segment => segment.x === newFood.x && segment.y === newFood.y))
+    return newFood
+  }, [])
+
+  // Start the game
+  const startGame = useCallback(() => {
+    setSnake([{ x: 10, y: 10 }])
+    setFood(generateFood([{ x: 10, y: 10 }]))
+    setDirection({ x: 1, y: 0 })
+    directionRef.current = { x: 1, y: 0 }
+    setScore(0)
+    setGameOver(false)
+    setGameStarted(true)
+    
+    // Focus the game container for keyboard events
+    if (gameContainerRef.current) {
+      gameContainerRef.current.focus()
+    }
+  }, [generateFood])
+
+  // Handle keyboard input
+  const handleKeyDown = useCallback((e) => {
+    if (!gameStarted || gameOver) return
+    
+    const key = e.key
+    const currentDir = directionRef.current
+    
+    if ((key === 'ArrowUp' || key === 'w' || key === 'W') && currentDir.y !== 1) {
+      directionRef.current = { x: 0, y: -1 }
+      setDirection({ x: 0, y: -1 })
+    } else if ((key === 'ArrowDown' || key === 's' || key === 'S') && currentDir.y !== -1) {
+      directionRef.current = { x: 0, y: 1 }
+      setDirection({ x: 0, y: 1 })
+    } else if ((key === 'ArrowLeft' || key === 'a' || key === 'A') && currentDir.x !== 1) {
+      directionRef.current = { x: -1, y: 0 }
+      setDirection({ x: -1, y: 0 })
+    } else if ((key === 'ArrowRight' || key === 'd' || key === 'D') && currentDir.x !== -1) {
+      directionRef.current = { x: 1, y: 0 }
+      setDirection({ x: 1, y: 0 })
+    }
+    
+    e.preventDefault()
+  }, [gameStarted, gameOver])
+
+  // Game loop
+  useEffect(() => {
+    if (!gameStarted || gameOver) return
+
+    const moveSnake = () => {
+      setSnake(prevSnake => {
+        const head = prevSnake[0]
+        const dir = directionRef.current
+        const newHead = {
+          x: (head.x + dir.x + GRID_SIZE) % GRID_SIZE,
+          y: (head.y + dir.y + GRID_SIZE) % GRID_SIZE
+        }
+
+        // Check self collision
+        if (prevSnake.some(segment => segment.x === newHead.x && segment.y === newHead.y)) {
+          setGameOver(true)
+          setHighScore(prev => Math.max(prev, score))
+          return prevSnake
+        }
+
+        const newSnake = [newHead, ...prevSnake]
+
+        // Check food collision
+        if (newHead.x === food.x && newHead.y === food.y) {
+          setScore(prev => prev + 10)
+          setFood(generateFood(newSnake))
+          return newSnake
+        }
+
+        newSnake.pop()
+        return newSnake
+      })
+    }
+
+    gameLoopRef.current = setInterval(moveSnake, GAME_SPEED)
+
+    return () => {
+      if (gameLoopRef.current) {
+        clearInterval(gameLoopRef.current)
+      }
+    }
+  }, [gameStarted, gameOver, food, generateFood, score])
+
+  // Snake game code for display
+  const snakeGameHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>🐍 Snake Game</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="game-container">
+    <div class="score-board">
+      <span>Score: <span id="score">0</span></span>
+      <span>High: <span id="high">0</span></span>
+    </div>
+    <canvas id="game" width="300" height="300"></canvas>
+    <button id="start-btn">🎮 Start Game</button>
+    <p class="controls">Use Arrow Keys to Move</p>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>`
+
+  const snakeGameCSS = `* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  font-family: 'Inter', sans-serif;
+}
+
+.game-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.score-board {
+  display: flex;
+  gap: 24px;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+#score, #high {
+  color: #34d399;
+}
+
+#game {
+  background: #0f0f1a;
+  border-radius: 12px;
+  border: 2px solid rgba(52, 211, 153, 0.3);
+  box-shadow: 0 0 40px rgba(52, 211, 153, 0.2);
+}
+
+#start-btn {
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #34d399, #059669);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+#start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(52, 211, 153, 0.4);
+}
+
+.controls {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+}`
+
+  const snakeGameJS = `const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const startBtn = document.getElementById('start-btn');
+const scoreEl = document.getElementById('score');
+const highEl = document.getElementById('high');
+
+const GRID = 20;
+const CELL = canvas.width / GRID;
+let snake = [{ x: 10, y: 10 }];
+let food = { x: 15, y: 10 };
+let dir = { x: 0, y: 0 };
+let score = 0;
+let highScore = 0;
+let gameLoop = null;
+
+const draw = () => {
+  // Clear canvas
+  ctx.fillStyle = '#0f0f1a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Draw food with glow effect
+  ctx.shadowColor = '#ef4444';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#ef4444';
+  ctx.beginPath();
+  ctx.arc(
+    food.x * CELL + CELL / 2,
+    food.y * CELL + CELL / 2,
+    CELL / 2 - 2, 0, Math.PI * 2
+  );
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  
+  // Draw snake
+  snake.forEach((seg, i) => {
+    const gradient = ctx.createLinearGradient(
+      seg.x * CELL, seg.y * CELL,
+      seg.x * CELL + CELL, seg.y * CELL + CELL
+    );
+    gradient.addColorStop(0, '#34d399');
+    gradient.addColorStop(1, '#059669');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(
+      seg.x * CELL + 1, seg.y * CELL + 1,
+      CELL - 2, CELL - 2
+    );
+  });
+};
+
+const move = () => {
+  const head = { 
+    x: (snake[0].x + dir.x + GRID) % GRID,
+    y: (snake[0].y + dir.y + GRID) % GRID 
+  };
+  
+  if (snake.some(s => s.x === head.x && s.y === head.y)) {
+    clearInterval(gameLoop);
+    highScore = Math.max(highScore, score);
+    highEl.textContent = highScore;
+    startBtn.textContent = '🔄 Play Again';
+    return;
+  }
+  
+  snake.unshift(head);
+  if (head.x === food.x && head.y === food.y) {
+    score += 10;
+    scoreEl.textContent = score;
+    food = {
+      x: Math.floor(Math.random() * GRID),
+      y: Math.floor(Math.random() * GRID)
+    };
+  } else {
+    snake.pop();
+  }
+  draw();
+};
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowUp' && dir.y !== 1) dir = { x: 0, y: -1 };
+  if (e.key === 'ArrowDown' && dir.y !== -1) dir = { x: 0, y: 1 };
+  if (e.key === 'ArrowLeft' && dir.x !== 1) dir = { x: -1, y: 0 };
+  if (e.key === 'ArrowRight' && dir.x !== -1) dir = { x: 1, y: 0 };
+});
+
+startBtn.addEventListener('click', () => {
+  snake = [{ x: 10, y: 10 }];
+  dir = { x: 1, y: 0 };
+  score = 0;
+  scoreEl.textContent = 0;
+  startBtn.textContent = '🎮 Playing...';
+  if (gameLoop) clearInterval(gameLoop);
+  gameLoop = setInterval(move, 120);
+});
+
+draw();`
 
   const features = [
     {
@@ -305,10 +596,22 @@ export const Landing = () => {
 
           {/* CTA Buttons */}
           <div style={heroCTAStyle}>
-            <Link to="/editor/playground" style={primaryCTAStyle}>
-              Start Creating Free
+            <button
+              onClick={() => {
+                const showcaseSection = document.getElementById('showcase')
+                if (showcaseSection) {
+                  showcaseSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }
+              }}
+              style={{
+                ...primaryCTAStyle,
+                cursor: 'pointer',
+                border: 'none',
+              }}
+            >
+              View Showcase
               <ArrowRight size={18} />
-            </Link>
+            </button>
             <Link to="/editor/playground" style={secondaryCTAStyle}>
               <Play size={18} style={{ marginRight: '8px' }} />
               Try the Editor
@@ -398,10 +701,10 @@ export const Landing = () => {
       <section id="showcase" style={showcaseStyle}>
         <div style={showcaseContainerStyle}>
           <div style={sectionHeaderStyle}>
-            <span style={sectionTagStyle}>Showcase</span>
+            <span style={sectionTagStyle}>🎮 Interactive Demo</span>
             <h2 style={sectionTitleStyle}>See BumuO in action</h2>
             <p style={sectionDescStyle}>
-              Experience the seamless workflow of building and previewing in real-time.
+              A fully playable Snake game built with HTML, CSS, and JavaScript. This is what you can create with BumuO!
             </p>
           </div>
 
@@ -431,185 +734,230 @@ export const Landing = () => {
                 </div>
                 <div style={editorCodeStyle}>
                   <pre style={codeBlockStyle}>
-{activeTab === 'html' ? `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <title>My Project</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <div class="container">
-    <h1 id="title">Hello, BumuO! 👋</h1>
-    <p>Start building amazing things.</p>
-    <button id="magic-btn">
-      Click for magic ✨
-    </button>
-    <div id="particles"></div>
-  </div>
-  <script src="script.js"></script>
-</body>
-</html>` : activeTab === 'css' ? `.container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  font-family: 'Inter', sans-serif;
-}
-
-h1 {
-  font-size: 2.5rem;
-  color: #1e1e2e;
-  margin-bottom: 0.5rem;
-  transition: all 0.3s ease;
-}
-
-h1.rainbow {
-  background: linear-gradient(90deg, #ff6b6b, #feca57, 
-    #48dbfb, #ff9ff3, #54a0ff);
-  background-size: 400% 400%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: rainbow 2s ease infinite;
-}
-
-p {
-  color: #6b7280;
-  font-size: 1.1rem;
-  margin-bottom: 1.5rem;
-}
-
-#magic-btn {
-  padding: 12px 28px;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-#magic-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4);
-}
-
-@keyframes rainbow {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}` : `const btn = document.getElementById('magic-btn');
-const title = document.getElementById('title');
-let clickCount = 0;
-
-const messages = [
-  "Hello, BumuO! 👋",
-  "You clicked! 🎉",
-  "Keep going! 🚀",
-  "You're amazing! ⭐",
-  "Code is poetry 💻",
-  "console.log('🔥')",
-  "while(true) { learn() }",
-  "git commit -m 'magic'",
-];
-
-const createParticle = (x, y) => {
-  const particle = document.createElement('span');
-  particle.innerHTML = ['✨', '🎉', '💫', '⭐', '🚀'][
-    Math.floor(Math.random() * 5)
-  ];
-  particle.style.cssText = \`
-    position: fixed;
-    pointer-events: none;
-    font-size: 24px;
-    left: \${x}px;
-    top: \${y}px;
-    animation: float 1s ease-out forwards;
-  \`;
-  document.body.appendChild(particle);
-  setTimeout(() => particle.remove(), 1000);
-};
-
-btn.addEventListener('click', (e) => {
-  clickCount++;
-  title.textContent = messages[clickCount % messages.length];
-  title.classList.add('rainbow');
-  
-  // Create burst of particles
-  for (let i = 0; i < 8; i++) {
-    setTimeout(() => {
-      createParticle(
-        e.clientX + (Math.random() - 0.5) * 100,
-        e.clientY + (Math.random() - 0.5) * 100
-      );
-    }, i * 50);
-  }
-});`}
+{activeTab === 'html' ? snakeGameHTML : activeTab === 'css' ? snakeGameCSS : snakeGameJS}
                   </pre>
                 </div>
               </div>
 
-              {/* Preview Panel */}
+              {/* Preview Panel - Snake Game */}
               <div style={previewPanelStyle}>
                 <div style={previewHeaderStyle}>
-                  <span style={previewDotStyle} />
-                  <span style={previewUrlStyle}>preview.bumuo.dev</span>
+                  <span style={{
+                    ...previewDotStyle,
+                    background: gameStarted && !gameOver ? '#34d399' : gameOver ? '#ef4444' : '#f59e0b',
+                  }} />
+                  <span style={previewUrlStyle}>snake.bumuo.dev</span>
+                  {gameStarted && (
+                    <span style={{
+                      marginLeft: 'auto',
+                      fontSize: '13px',
+                      color: '#34d399',
+                      fontWeight: 600,
+                    }}>
+                      Score: {score} | High: {highScore}
+                    </span>
+                  )}
                 </div>
-                <div style={{
-                  ...previewContentStyle,
-                  background: magicActive 
-                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                    : '#ffffff',
-                }}>
-                  <h1 style={{
-                    ...previewH1Style,
-                    ...(magicActive ? {
-                      background: 'linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #54a0ff)',
-                      backgroundSize: '400% 400%',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      animation: 'rainbow-text 2s ease infinite',
-                    } : {}),
-                  }}>
-                    {magicActive 
-                      ? ['Hello, BumuO! 👋', 'You clicked! 🎉', 'Keep going! 🚀', 'You\'re amazing! ⭐', 'Code is poetry 💻', 'console.log(\'🔥\')', 'while(true) { learn() }', 'git commit -m \'magic\''][clickCount % 8]
-                      : 'Hello, BumuO! 👋'
-                    }
-                  </h1>
-                  <p style={{
-                    ...previewPStyle,
-                    color: magicActive ? 'rgba(255,255,255,0.8)' : '#6b7280',
-                  }}>Start building amazing things.</p>
-                  <button 
-                    style={{
-                      ...previewButtonStyle,
-                      transform: magicActive ? 'scale(1.05)' : 'scale(1)',
-                    }}
-                    onClick={() => {
-                      setMagicActive(true)
-                      setClickCount(prev => prev + 1)
-                    }}
-                  >
-                    Click for magic ✨
-                  </button>
-                  {magicActive && (
-                    <div style={particleContainerStyle}>
-                      {[...Array(12)].map((_, i) => (
-                        <span 
-                          key={`${clickCount}-${i}`} 
-                          style={{
-                            ...floatingParticleStyle,
-                            left: `${20 + Math.random() * 60}%`,
-                            animationDelay: `${i * 0.1}s`,
-                          }}
-                        >
-                          {['✨', '🎉', '💫', '⭐', '🚀', '💻'][i % 6]}
-                        </span>
-                      ))}
+                <div 
+                  ref={gameContainerRef}
+                  tabIndex={0}
+                  onKeyDown={handleKeyDown}
+                  style={{
+                    ...previewContentStyle,
+                    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                    outline: 'none',
+                  }}
+                >
+                  {!gameStarted ? (
+                    // Start Screen
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '20px',
+                    }}>
+                      <div style={{
+                        fontSize: '64px',
+                        animation: 'pulse 2s ease-in-out infinite',
+                      }}>🐍</div>
+                      <h2 style={{
+                        fontSize: '24px',
+                        fontWeight: 700,
+                        color: '#ffffff',
+                        margin: 0,
+                      }}>Snake Game</h2>
+                      <p style={{
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        fontSize: '14px',
+                        margin: 0,
+                      }}>Built with BumuO</p>
+                      <button
+                        onClick={startGame}
+                        style={{
+                          padding: '14px 32px',
+                          background: 'linear-gradient(135deg, #34d399 0%, #059669 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '12px',
+                          fontSize: '16px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 8px 25px rgba(52, 211, 153, 0.4)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)'
+                          e.currentTarget.style.boxShadow = '0 12px 35px rgba(52, 211, 153, 0.5)'
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)'
+                          e.currentTarget.style.boxShadow = '0 8px 25px rgba(52, 211, 153, 0.4)'
+                        }}
+                      >
+                        <Play size={18} />
+                        Click to Play!
+                      </button>
+                      <p style={{
+                        color: 'rgba(255, 255, 255, 0.4)',
+                        fontSize: '12px',
+                        margin: 0,
+                      }}>Use Arrow Keys or WASD to move</p>
+                    </div>
+                  ) : gameOver ? (
+                    // Game Over Screen
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '16px',
+                    }}>
+                      <div style={{ fontSize: '48px' }}>💀</div>
+                      <h2 style={{
+                        fontSize: '28px',
+                        fontWeight: 700,
+                        color: '#ef4444',
+                        margin: 0,
+                      }}>Game Over!</h2>
+                      <div style={{
+                        display: 'flex',
+                        gap: '20px',
+                        fontSize: '16px',
+                        color: 'rgba(255, 255, 255, 0.8)',
+                      }}>
+                        <span>Score: <span style={{ color: '#34d399', fontWeight: 700 }}>{score}</span></span>
+                        <span>High Score: <span style={{ color: '#fbbf24', fontWeight: 700 }}>{highScore}</span></span>
+                      </div>
+                      <button
+                        onClick={startGame}
+                        style={{
+                          padding: '12px 28px',
+                          background: 'linear-gradient(135deg, #34d399 0%, #059669 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '10px',
+                          fontSize: '15px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 6px 20px rgba(52, 211, 153, 0.35)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          marginTop: '8px',
+                        }}
+                      >
+                        🔄 Play Again
+                      </button>
+                    </div>
+                  ) : (
+                    // Game Canvas
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}>
+                      {/* Game Grid */}
+                      <div style={{
+                        width: GRID_SIZE * CELL_SIZE,
+                        height: GRID_SIZE * CELL_SIZE,
+                        background: '#0f0f1a',
+                        borderRadius: '12px',
+                        border: '2px solid rgba(52, 211, 153, 0.3)',
+                        boxShadow: '0 0 40px rgba(52, 211, 153, 0.15)',
+                        position: 'relative',
+                        overflow: 'hidden',
+                      }}>
+                        {/* Grid lines (subtle) */}
+                        <div style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundImage: 'linear-gradient(rgba(52, 211, 153, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(52, 211, 153, 0.05) 1px, transparent 1px)',
+                          backgroundSize: `${CELL_SIZE}px ${CELL_SIZE}px`,
+                          pointerEvents: 'none',
+                        }} />
+                        
+                        {/* Food */}
+                        <div style={{
+                          position: 'absolute',
+                          left: food.x * CELL_SIZE,
+                          top: food.y * CELL_SIZE,
+                          width: CELL_SIZE,
+                          height: CELL_SIZE,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <div style={{
+                            width: CELL_SIZE - 4,
+                            height: CELL_SIZE - 4,
+                            background: '#ef4444',
+                            borderRadius: '50%',
+                            boxShadow: '0 0 10px #ef4444, 0 0 20px rgba(239, 68, 68, 0.5)',
+                          }} />
+                        </div>
+                        
+                        {/* Snake */}
+                        {snake.map((segment, index) => (
+                          <div
+                            key={index}
+                            style={{
+                              position: 'absolute',
+                              left: segment.x * CELL_SIZE + 1,
+                              top: segment.y * CELL_SIZE + 1,
+                              width: CELL_SIZE - 2,
+                              height: CELL_SIZE - 2,
+                              background: index === 0 
+                                ? 'linear-gradient(135deg, #34d399, #10b981)'
+                                : 'linear-gradient(135deg, #059669, #047857)',
+                              borderRadius: index === 0 ? '4px' : '2px',
+                              boxShadow: index === 0 ? '0 0 8px rgba(52, 211, 153, 0.6)' : 'none',
+                              transition: 'left 0.08s linear, top 0.08s linear',
+                            }}
+                          />
+                        ))}
+                      </div>
+                      
+                      {/* Controls hint */}
+                      <div style={{
+                        display: 'flex',
+                        gap: '8px',
+                        marginTop: '8px',
+                      }}>
+                        {['↑', '↓', '←', '→'].map((arrow, i) => (
+                          <span key={i} style={{
+                            padding: '6px 10px',
+                            background: 'rgba(52, 211, 153, 0.1)',
+                            border: '1px solid rgba(52, 211, 153, 0.3)',
+                            borderRadius: '6px',
+                            color: 'rgba(255, 255, 255, 0.6)',
+                            fontSize: '12px',
+                          }}>{arrow}</span>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

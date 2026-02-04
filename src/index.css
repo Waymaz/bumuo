@@ -148,6 +148,11 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
 @keyframes pulse-subtle {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
@@ -156,6 +161,58 @@
 @keyframes glow-pulse {
   0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); }
   50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.4); }
+}
+
+/* Showcase Magic Button Animations */
+@keyframes ripple-expand {
+  from { 
+    width: 0; 
+    height: 0; 
+    opacity: 1;
+  }
+  to { 
+    width: 300px; 
+    height: 300px; 
+    margin-left: -150px;
+    margin-top: -150px;
+    opacity: 0;
+  }
+}
+
+@keyframes matrix-fall {
+  0% { 
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% { 
+    transform: translateY(400px);
+    opacity: 0;
+  }
+}
+
+@keyframes float-up-particle {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100px) scale(0.5) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes rainbow-text {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
 /* ===========================================

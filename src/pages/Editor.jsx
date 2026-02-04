@@ -4,7 +4,7 @@ import {
   Save, Share2, ArrowLeft, Play, Sparkles, Code, Palette, Zap,
   PanelLeft, PanelRight, PanelBottom, EyeOff, Eye, Maximize2, Minimize2,
   RefreshCw, Settings, ChevronDown, Monitor, Tablet, Smartphone, GripVertical,
-  Globe, Lock, UserPlus, LogIn, X, AlertCircle
+  Globe, Lock, UserPlus, LogIn, X, AlertCircle, Copy, Check, ExternalLink, GitFork
 } from 'lucide-react'
 import { Navbar } from '../components/Navbar'
 import { CodeEditor } from '../components/CodeEditor'
@@ -13,6 +13,41 @@ import { PreviewErrorBoundary } from '../components/ErrorBoundary'
 import { VisibilityToggle, PublicConfirmDialog } from '../components/VisibilityToggle'
 import { projectService } from '../services/projectService'
 import { useAuth } from '../context/AuthContext'
+
+// Cross-platform clipboard copy function
+const copyToClipboard = async (text) => {
+  try {
+    // Modern async clipboard API (works on most browsers including Safari)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+    
+    // Fallback for older browsers or restricted contexts
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-999999px'
+    textArea.style.top = '-999999px'
+    textArea.style.opacity = '0'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    
+    try {
+      document.execCommand('copy')
+      textArea.remove()
+      return true
+    } catch (err) {
+      console.error('Fallback copy failed:', err)
+      textArea.remove()
+      return false
+    }
+  } catch (err) {
+    console.error('Copy to clipboard failed:', err)
+    return false
+  }
+}
 
 // Custom hook for resizable panels
 const useResizable = (initialSizes, direction = 'vertical') => {
@@ -95,11 +130,16 @@ export const Editor = () => {
   const [saving, setSaving] = useState(false)
   const [autoRun, setAutoRun] = useState(true)
   const [previewKey, setPreviewKey] = useState(0)
-  const [shareSuccess, setShareSuccess] = useState(false)
   const [isPublic, setIsPublic] = useState(false)
   const [showPublicConfirm, setShowPublicConfirm] = useState(false)
   const [togglingVisibility, setTogglingVisibility] = useState(false)
   const [showSavePrompt, setShowSavePrompt] = useState(false)
+  
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shareLinks, setShareLinks] = useState({ readOnly: '', withCode: '' })
+  const [copiedLink, setCopiedLink] = useState(null) // 'readonly' | 'withcode' | null
+  const [generatingLinks, setGeneratingLinks] = useState(false)
   
   // Playground mode - for non-logged in users (check pathname since route has no :id param)
   const isPlayground = location.pathname === '/editor/playground'
@@ -330,14 +370,40 @@ export const Editor = () => {
   }
 
   const handleShare = async () => {
-    const { data } = await projectService.generatePublicLink(id)
+    setShowShareModal(true)
+    setGeneratingLinks(true)
+    setCopiedLink(null)
     
-    if (data?.public_link) {
-      const shareUrl = `${window.location.origin}/share/${data.public_link}`
-      navigator.clipboard.writeText(shareUrl)
-      setShareSuccess(true)
-      setTimeout(() => setShareSuccess(false), 3000)
+    try {
+      const { data } = await projectService.generatePublicLink(id)
+      
+      if (data?.public_link) {
+        const baseUrl = `${window.location.origin}/share/${data.public_link}`
+        setShareLinks({
+          readOnly: `${baseUrl}?mode=readonly`,
+          withCode: `${baseUrl}?mode=fork`
+        })
+      }
+    } catch (error) {
+      console.error('Failed to generate share links:', error)
+    } finally {
+      setGeneratingLinks(false)
     }
+  }
+  
+  const handleCopyLink = async (type) => {
+    const link = type === 'readonly' ? shareLinks.readOnly : shareLinks.withCode
+    const success = await copyToClipboard(link)
+    
+    if (success) {
+      setCopiedLink(type)
+      setTimeout(() => setCopiedLink(null), 3000)
+    }
+  }
+  
+  const handleOpenLink = (type) => {
+    const link = type === 'readonly' ? shareLinks.readOnly : shareLinks.withCode
+    window.open(link, '_blank', 'noopener,noreferrer')
   }
 
   const getDeviceWidth = () => {
@@ -736,21 +802,7 @@ export const Editor = () => {
               title="Share Project"
             >
               <Share2 style={{ width: '16px', height: '16px' }} />
-              <span className="hidden-mobile">{shareSuccess ? 'Copied!' : 'Share'}</span>
-              {shareSuccess && (
-                <div 
-                  style={{
-                    position: 'absolute',
-                    top: '-4px',
-                    right: '-4px',
-                    width: '10px',
-                    height: '10px',
-                    background: '#34d399',
-                    borderRadius: '50%',
-                    animation: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite',
-                  }}
-                />
-              )}
+              <span className="hidden-mobile">Share</span>
             </button>
           )}
           
@@ -1184,6 +1236,20 @@ export const Editor = () => {
         <PublicConfirmDialog 
           onConfirm={handleConfirmPublic}
           onCancel={() => setShowPublicConfirm(false)}
+        />
+      )}
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          shareLinks={shareLinks}
+          loading={generatingLinks}
+          copiedLink={copiedLink}
+          onCopyLink={handleCopyLink}
+          onOpenLink={handleOpenLink}
+          projectTitle={title}
         />
       )}
 
@@ -1695,6 +1761,345 @@ const SavePromptModal = ({ onClose, onLogin, onSignUp }) => (
         }}
       >
         <X style={{ width: '18px', height: '18px' }} />
+      </button>
+    </div>
+  </div>
+)
+
+// Share Modal Component
+const ShareModal = ({ 
+  isOpen, 
+  onClose, 
+  shareLinks, 
+  loading, 
+  copiedLink, 
+  onCopyLink, 
+  onOpenLink,
+  projectTitle 
+}) => {
+  if (!isOpen) return null
+
+  return (
+    <div 
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 200,
+        padding: '16px',
+        animation: 'fade-in 0.2s ease',
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div 
+        style={{
+          position: 'relative',
+          background: 'linear-gradient(180deg, var(--color-surface-900) 0%, var(--color-surface-950) 100%)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '24px',
+          padding: '32px',
+          maxWidth: '520px',
+          width: '100%',
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05) inset',
+          animation: 'scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
+        {/* Close button */}
+        <button 
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            padding: '8px',
+            background: 'var(--color-surface-800)',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            borderRadius: '10px',
+            color: 'var(--color-surface-400)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--color-surface-700)'
+            e.currentTarget.style.color = '#ffffff'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'var(--color-surface-800)'
+            e.currentTarget.style.color = 'var(--color-surface-400)'
+          }}
+        >
+          <X style={{ width: '18px', height: '18px' }} />
+        </button>
+
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div 
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '60px',
+              height: '60px',
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
+              borderRadius: '18px',
+              marginBottom: '16px',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+            }}
+          >
+            <Share2 style={{ width: '28px', height: '28px', color: '#60a5fa' }} />
+          </div>
+          <h3 
+            style={{
+              fontSize: '22px',
+              fontWeight: 700,
+              color: '#ffffff',
+              marginBottom: '8px',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Share Project
+          </h3>
+          <p 
+            style={{
+              fontSize: '14px',
+              color: 'var(--color-surface-400)',
+            }}
+          >
+            Choose how you want to share "{projectTitle}"
+          </p>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <div 
+              style={{
+                width: '40px',
+                height: '40px',
+                border: '3px solid var(--color-surface-700)',
+                borderTopColor: 'var(--color-primary-500)',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+                margin: '0 auto 16px',
+              }}
+            />
+            <p style={{ color: 'var(--color-surface-400)', fontSize: '14px' }}>
+              Generating share links...
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Read-Only Option */}
+            <ShareOption
+              icon={<Eye style={{ width: '22px', height: '22px' }} />}
+              title="Share Read-Only"
+              description="Viewers can only see the live output — perfect for showcasing your work"
+              link={shareLinks.readOnly}
+              isCopied={copiedLink === 'readonly'}
+              onCopy={() => onCopyLink('readonly')}
+              onOpen={() => onOpenLink('readonly')}
+              gradient="linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%)"
+              borderColor="rgba(16, 185, 129, 0.3)"
+              iconColor="#34d399"
+            />
+
+            {/* With Code Option */}
+            <ShareOption
+              icon={<GitFork style={{ width: '22px', height: '22px' }} />}
+              title="Share with Code"
+              description="Viewers can see and fork the code — great for learning and collaboration"
+              link={shareLinks.withCode}
+              isCopied={copiedLink === 'withcode'}
+              onCopy={() => onCopyLink('withcode')}
+              onOpen={() => onOpenLink('withcode')}
+              gradient="linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(59, 130, 246, 0.15) 100%)"
+              borderColor="rgba(139, 92, 246, 0.3)"
+              iconColor="#a78bfa"
+            />
+          </div>
+        )}
+
+        {/* Footer note */}
+        <p 
+          style={{
+            fontSize: '12px',
+            color: 'var(--color-surface-500)',
+            textAlign: 'center',
+            marginTop: '24px',
+            lineHeight: 1.5,
+          }}
+        >
+          Anyone with the link can access. Make sure your project is set to public.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// Share Option Component
+const ShareOption = ({ 
+  icon, 
+  title, 
+  description, 
+  link, 
+  isCopied, 
+  onCopy, 
+  onOpen,
+  gradient,
+  borderColor,
+  iconColor
+}) => (
+  <div 
+    style={{
+      background: gradient,
+      border: `1px solid ${borderColor}`,
+      borderRadius: '16px',
+      padding: '20px',
+      transition: 'all 0.3s ease',
+    }}
+  >
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '16px' }}>
+      <div 
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '44px',
+          height: '44px',
+          background: 'rgba(255, 255, 255, 0.05)',
+          borderRadius: '12px',
+          color: iconColor,
+          flexShrink: 0,
+        }}
+      >
+        {icon}
+      </div>
+      <div style={{ flex: 1 }}>
+        <h4 
+          style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#ffffff',
+            marginBottom: '4px',
+          }}
+        >
+          {title}
+        </h4>
+        <p 
+          style={{
+            fontSize: '13px',
+            color: 'var(--color-surface-400)',
+            lineHeight: 1.5,
+          }}
+        >
+          {description}
+        </p>
+      </div>
+    </div>
+
+    {/* Link Input with Copy */}
+    <div 
+      style={{
+        display: 'flex',
+        gap: '8px',
+        background: 'rgba(0, 0, 0, 0.2)',
+        borderRadius: '12px',
+        padding: '4px',
+      }}
+    >
+      <input
+        type="text"
+        value={link}
+        readOnly
+        style={{
+          flex: 1,
+          padding: '10px 14px',
+          background: 'transparent',
+          border: 'none',
+          borderRadius: '8px',
+          color: 'var(--color-surface-300)',
+          fontSize: '13px',
+          outline: 'none',
+          fontFamily: 'monospace',
+          minWidth: 0,
+        }}
+        onClick={(e) => e.target.select()}
+      />
+      <button
+        onClick={onCopy}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
+          padding: '10px 16px',
+          background: isCopied 
+            ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)' 
+            : 'var(--color-surface-700)',
+          border: 'none',
+          borderRadius: '8px',
+          color: '#ffffff',
+          fontWeight: 500,
+          fontSize: '13px',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          whiteSpace: 'nowrap',
+        }}
+        onMouseEnter={(e) => {
+          if (!isCopied) {
+            e.currentTarget.style.background = 'var(--color-surface-600)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isCopied) {
+            e.currentTarget.style.background = 'var(--color-surface-700)'
+          }
+        }}
+      >
+        {isCopied ? (
+          <>
+            <Check style={{ width: '14px', height: '14px' }} />
+            Copied!
+          </>
+        ) : (
+          <>
+            <Copy style={{ width: '14px', height: '14px' }} />
+            Copy
+          </>
+        )}
+      </button>
+      <button
+        onClick={onOpen}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '10px 12px',
+          background: 'var(--color-surface-700)',
+          border: 'none',
+          borderRadius: '8px',
+          color: 'var(--color-surface-300)',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'var(--color-surface-600)'
+          e.currentTarget.style.color = '#ffffff'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'var(--color-surface-700)'
+          e.currentTarget.style.color = 'var(--color-surface-300)'
+        }}
+        title="Open in new tab"
+      >
+        <ExternalLink style={{ width: '14px', height: '14px' }} />
       </button>
     </div>
   </div>
