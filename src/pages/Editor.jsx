@@ -49,70 +49,100 @@ const copyToClipboard = async (text) => {
   }
 }
 
-// Custom hook for resizable panels
+// Reusable drag overlay - prevents iframes from stealing mouse events during resize
+const createDragOverlay = () => {
+  const overlay = document.createElement('div')
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;cursor:inherit;'
+  return overlay
+}
+
+// Custom hook for resizable panels (code editor splits)
 const useResizable = (initialSizes, direction = 'vertical') => {
   const [sizes, setSizes] = useState(initialSizes)
   const containerRef = useRef(null)
   const draggingIndex = useRef(null)
   const startPos = useRef(0)
   const startSizes = useRef([])
+  const rafId = useRef(null)
+  const overlayRef = useRef(null)
+  const sizesRef = useRef(sizes)
+  sizesRef.current = sizes
 
   const handleMouseDown = useCallback((index, e) => {
     e.preventDefault()
     draggingIndex.current = index
     startPos.current = direction === 'vertical' ? e.clientY : e.clientX
-    startSizes.current = [...sizes]
-    document.body.style.cursor = direction === 'vertical' ? 'row-resize' : 'col-resize'
+    startSizes.current = [...sizesRef.current]
+    
+    // Set cursor and prevent text selection
+    const cursor = direction === 'vertical' ? 'row-resize' : 'col-resize'
+    document.body.style.cursor = cursor
     document.body.style.userSelect = 'none'
-  }, [sizes, direction])
-
-  const handleMouseMove = useCallback((e) => {
-    if (draggingIndex.current === null || !containerRef.current) return
-
-    const container = containerRef.current
-    const containerSize = direction === 'vertical' 
-      ? container.offsetHeight 
-      : container.offsetWidth
-    const currentPos = direction === 'vertical' ? e.clientY : e.clientX
-    const delta = currentPos - startPos.current
-    const deltaPercent = (delta / containerSize) * 100
-
-    const newSizes = [...startSizes.current]
-    const idx = draggingIndex.current
-
-    // Ensure minimum size of 10%
-    const minSize = 10
-    let newSize1 = startSizes.current[idx] + deltaPercent
-    let newSize2 = startSizes.current[idx + 1] - deltaPercent
-
-    if (newSize1 < minSize) {
-      newSize1 = minSize
-      newSize2 = startSizes.current[idx] + startSizes.current[idx + 1] - minSize
-    }
-    if (newSize2 < minSize) {
-      newSize2 = minSize
-      newSize1 = startSizes.current[idx] + startSizes.current[idx + 1] - minSize
-    }
-
-    newSizes[idx] = newSize1
-    newSizes[idx + 1] = newSize2
-    setSizes(newSizes)
+    
+    // Add an overlay so iframes don't capture mouse events
+    overlayRef.current = createDragOverlay()
+    overlayRef.current.style.cursor = cursor
+    document.body.appendChild(overlayRef.current)
   }, [direction])
 
-  const handleMouseUp = useCallback(() => {
-    draggingIndex.current = null
-    document.body.style.cursor = ''
-    document.body.style.userSelect = ''
-  }, [])
-
   useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (draggingIndex.current === null || !containerRef.current) return
+
+      // Use rAF for smooth, jank-free updates
+      if (rafId.current) cancelAnimationFrame(rafId.current)
+      rafId.current = requestAnimationFrame(() => {
+        const container = containerRef.current
+        if (!container) return
+        
+        const containerSize = direction === 'vertical' 
+          ? container.offsetHeight 
+          : container.offsetWidth
+        if (containerSize === 0) return
+        
+        const currentPos = direction === 'vertical' ? e.clientY : e.clientX
+        const delta = currentPos - startPos.current
+        const deltaPercent = (delta / containerSize) * 100
+        const idx = draggingIndex.current
+
+        const minSize = 10
+        const total = startSizes.current[idx] + startSizes.current[idx + 1]
+        let newSize1 = Math.max(minSize, Math.min(total - minSize, startSizes.current[idx] + deltaPercent))
+        let newSize2 = total - newSize1
+
+        const newSizes = [...startSizes.current]
+        newSizes[idx] = newSize1
+        newSizes[idx + 1] = newSize2
+        setSizes(newSizes)
+      })
+    }
+
+    const handleMouseUp = () => {
+      if (draggingIndex.current === null) return
+      draggingIndex.current = null
+      if (rafId.current) cancelAnimationFrame(rafId.current)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      
+      // Remove the drag overlay
+      if (overlayRef.current) {
+        overlayRef.current.remove()
+        overlayRef.current = null
+      }
+    }
+
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      if (rafId.current) cancelAnimationFrame(rafId.current)
+      if (overlayRef.current) {
+        overlayRef.current.remove()
+        overlayRef.current = null
+      }
     }
-  }, [handleMouseMove, handleMouseUp])
+  }, [direction])
 
   return { sizes, setSizes, containerRef, handleMouseDown }
 }
@@ -130,6 +160,13 @@ export const Editor = () => {
   const [saving, setSaving] = useState(false)
   const [autoRun, setAutoRun] = useState(true)
   const [previewKey, setPreviewKey] = useState(0)
+  
+  // Preview snapshot — the code actually rendered in the preview pane.
+  // Only updates on auto-run debounce or explicit Run action.
+  const [previewHtml, setPreviewHtml] = useState('')
+  const [previewCss, setPreviewCss] = useState('')
+  const [previewJs, setPreviewJs] = useState('')
+  
   const [isPublic, setIsPublic] = useState(false)
   const [showPublicConfirm, setShowPublicConfirm] = useState(false)
   const [togglingVisibility, setTogglingVisibility] = useState(false)
@@ -168,49 +205,70 @@ export const Editor = () => {
   const mainStartPos = useRef(0)
   const mainStartSize = useRef(50)
 
+  // Refs for main panel resize - avoid stale closures
+  const mainRafId = useRef(null)
+  const mainOverlayRef = useRef(null)
+  const editorPanelSizeRef = useRef(editorPanelSize)
+  editorPanelSizeRef.current = editorPanelSize
+  const previewPositionRef = useRef(previewPosition)
+  previewPositionRef.current = previewPosition
+
   // Main panel resize handlers
   const handleMainSplitMouseDown = useCallback((e) => {
     e.preventDefault()
     mainDragging.current = true
-    mainStartPos.current = previewPosition === 'bottom' ? e.clientY : e.clientX
-    mainStartSize.current = editorPanelSize
-    document.body.style.cursor = previewPosition === 'bottom' ? 'row-resize' : 'col-resize'
+    mainStartPos.current = previewPositionRef.current === 'bottom' ? e.clientY : e.clientX
+    mainStartSize.current = editorPanelSizeRef.current
+    
+    const cursor = previewPositionRef.current === 'bottom' ? 'row-resize' : 'col-resize'
+    document.body.style.cursor = cursor
     document.body.style.userSelect = 'none'
-  }, [editorPanelSize, previewPosition])
+    
+    // Add overlay to prevent iframes from stealing mouse events
+    mainOverlayRef.current = createDragOverlay()
+    mainOverlayRef.current.style.cursor = cursor
+    document.body.appendChild(mainOverlayRef.current)
+  }, [])
 
   useEffect(() => {
     const handleMainMouseMove = (e) => {
       if (!mainDragging.current || !mainSplitRef.current) return
       
-      const container = mainSplitRef.current.parentElement
-      const containerSize = previewPosition === 'bottom' 
-        ? container.offsetHeight 
-        : container.offsetWidth
-      const currentPos = previewPosition === 'bottom' ? e.clientY : e.clientX
-      const containerRect = container.getBoundingClientRect()
-      const startOffset = previewPosition === 'bottom' ? containerRect.top : containerRect.left
-      
-      // Calculate new size based on position within container
-      let newSize = ((currentPos - startOffset) / containerSize) * 100
-      
-      // For left preview, invert the calculation
-      if (previewPosition === 'left') {
-        newSize = 100 - newSize
-      }
-      
-      // Clamp between 20% and 80%
-      newSize = Math.max(20, Math.min(80, newSize))
-      setEditorPanelSize(newSize)
+      if (mainRafId.current) cancelAnimationFrame(mainRafId.current)
+      mainRafId.current = requestAnimationFrame(() => {
+        const container = mainSplitRef.current?.parentElement
+        if (!container) return
+        
+        const pos = previewPositionRef.current
+        const containerSize = pos === 'bottom' ? container.offsetHeight : container.offsetWidth
+        if (containerSize === 0) return
+        
+        const currentPos = pos === 'bottom' ? e.clientY : e.clientX
+        const containerRect = container.getBoundingClientRect()
+        const startOffset = pos === 'bottom' ? containerRect.top : containerRect.left
+        
+        let newSize = ((currentPos - startOffset) / containerSize) * 100
+        if (pos === 'left') newSize = 100 - newSize
+        
+        // Clamp between 20% and 80%
+        newSize = Math.max(20, Math.min(80, newSize))
+        setEditorPanelSize(newSize)
+      })
     }
 
     const handleMainMouseUp = () => {
       if (mainDragging.current) {
-        // Save to localStorage when resize ends
-        localStorage.setItem('bumuo-editor-panel-size', editorPanelSize.toString())
+        localStorage.setItem('bumuo-editor-panel-size', editorPanelSizeRef.current.toString())
       }
       mainDragging.current = false
+      if (mainRafId.current) cancelAnimationFrame(mainRafId.current)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
+      
+      if (mainOverlayRef.current) {
+        mainOverlayRef.current.remove()
+        mainOverlayRef.current = null
+      }
     }
 
     document.addEventListener('mousemove', handleMainMouseMove)
@@ -218,21 +276,39 @@ export const Editor = () => {
     return () => {
       document.removeEventListener('mousemove', handleMainMouseMove)
       document.removeEventListener('mouseup', handleMainMouseUp)
+      if (mainRafId.current) cancelAnimationFrame(mainRafId.current)
+      if (mainOverlayRef.current) {
+        mainOverlayRef.current.remove()
+        mainOverlayRef.current = null
+      }
     }
-  }, [previewPosition, editorPanelSize])
+  }, []) // Empty deps - uses refs for current values
 
   useEffect(() => {
     loadProject()
   }, [id, location.pathname])
 
+  // Auto-run: debounce code changes into the preview snapshot
   useEffect(() => {
     if (autoRun) {
       const timer = setTimeout(() => {
+        setPreviewHtml(html)
+        setPreviewCss(css)
+        setPreviewJs(js)
         setPreviewKey(prev => prev + 1)
       }, 500)
       return () => clearTimeout(timer)
     }
+    // When auto-run is OFF, do NOT update the preview — wait for explicit Run
   }, [html, css, js, autoRun])
+
+  // Explicit run — pushes current code to preview immediately
+  const runPreview = useCallback(() => {
+    setPreviewHtml(html)
+    setPreviewCss(css)
+    setPreviewJs(js)
+    setPreviewKey(prev => prev + 1)
+  }, [html, css, js])
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -257,12 +333,12 @@ export const Editor = () => {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault()
-        setPreviewKey(prev => prev + 1)
+        runPreview()
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [title, html, css, js, isPlayground, user])
+  }, [title, html, css, js, isPlayground, user, runPreview])
 
   const loadProject = async () => {
     // Handle playground mode for non-logged in users
@@ -277,6 +353,10 @@ export const Editor = () => {
           setHtml(data.html || '')
           setCss(data.css || '')
           setJs(data.js || '')
+          // Sync preview snapshot on load
+          setPreviewHtml(data.html || '')
+          setPreviewCss(data.css || '')
+          setPreviewJs(data.js || '')
           return
         } catch (e) {
           console.error('Failed to parse temp project:', e)
@@ -285,9 +365,15 @@ export const Editor = () => {
       // No temp project, create empty playground
       setProject({ id: 'playground', title: 'Playground' })
       setTitle('Playground')
-      setHtml('<h1>Hello, World!</h1>\n<p>Start coding here...</p>')
-      setCss('body {\n  font-family: system-ui, sans-serif;\n  padding: 20px;\n}')
-      setJs('// Your JavaScript here')
+      const defaultHtml = '<h1>Hello, World!</h1>\n<p>Start coding here...</p>'
+      const defaultCss = 'body {\n  font-family: system-ui, sans-serif;\n  padding: 20px;\n}'
+      const defaultJs = '// Your JavaScript here'
+      setHtml(defaultHtml)
+      setCss(defaultCss)
+      setJs(defaultJs)
+      setPreviewHtml(defaultHtml)
+      setPreviewCss(defaultCss)
+      setPreviewJs(defaultJs)
       return
     }
 
@@ -309,6 +395,10 @@ export const Editor = () => {
       setHtml(data.html || '')
       setCss(data.css || '')
       setJs(data.js || '')
+      // Sync preview snapshot on load
+      setPreviewHtml(data.html || '')
+      setPreviewCss(data.css || '')
+      setPreviewJs(data.js || '')
       setIsPublic(data.is_public || false)
     }
   }
@@ -748,7 +838,7 @@ export const Editor = () => {
           {/* Manual run button */}
           {!autoRun && (
             <button
-              onClick={() => setPreviewKey(prev => prev + 1)}
+              onClick={runPreview}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -939,15 +1029,16 @@ export const Editor = () => {
           >
             <PreviewSection 
               previewKey={previewKey} 
-              html={html} 
-              css={css} 
-              js={js}
+              html={previewHtml} 
+              css={previewCss} 
+              js={previewJs}
               previewDevice={previewDevice}
               setPreviewDevice={setPreviewDevice}
               showDeviceMenu={showDeviceMenu}
               setShowDeviceMenu={setShowDeviceMenu}
               getDeviceWidth={getDeviceWidth}
               setPreviewKey={setPreviewKey}
+              onRefresh={runPreview}
             />
           </div>
         )}
@@ -958,21 +1049,30 @@ export const Editor = () => {
             ref={mainSplitRef}
             style={{
               display: 'none',
-              width: '8px',
+              width: '14px',
               height: '100%',
               cursor: 'col-resize',
-              background: 'var(--color-surface-700)',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'background 0.15s ease',
               flexShrink: 0,
+              position: 'relative',
+              marginLeft: '-3px',
+              marginRight: '-3px',
+              zIndex: 10,
             }}
             className="main-resize-handle"
             onMouseDown={handleMainSplitMouseDown}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-primary-500)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface-700)'}
+            onMouseEnter={(e) => {
+              const bar = e.currentTarget.querySelector('.resize-bar')
+              if (bar) bar.style.background = 'var(--color-primary-500)'
+            }}
+            onMouseLeave={(e) => {
+              const bar = e.currentTarget.querySelector('.resize-bar')
+              if (bar) bar.style.background = 'var(--color-surface-700)'
+            }}
           >
-            <GripVertical style={{ width: '12px', height: '12px', color: 'var(--color-surface-500)' }} />
+            <div className="resize-bar" style={{ position: 'absolute', width: '4px', height: '100%', left: '50%', transform: 'translateX(-50%)', background: 'var(--color-surface-700)', borderRadius: '2px', transition: 'background 0.15s ease' }} />
+            <GripVertical style={{ width: '12px', height: '12px', color: 'var(--color-surface-500)', position: 'relative', zIndex: 1, pointerEvents: 'none' }} />
           </div>
         )}
 
@@ -1111,26 +1211,49 @@ export const Editor = () => {
             ref={mainSplitRef}
             style={{
               display: 'none',
-              width: previewPosition === 'bottom' ? '100%' : '8px',
-              height: previewPosition === 'bottom' ? '8px' : '100%',
+              width: previewPosition === 'bottom' ? '100%' : '14px',
+              height: previewPosition === 'bottom' ? '14px' : '100%',
               cursor: previewPosition === 'bottom' ? 'row-resize' : 'col-resize',
-              background: 'var(--color-surface-700)',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'background 0.15s ease',
               flexShrink: 0,
+              position: 'relative',
+              ...(previewPosition === 'bottom'
+                ? { marginTop: '-3px', marginBottom: '-3px' }
+                : { marginLeft: '-3px', marginRight: '-3px' }),
+              zIndex: 10,
             }}
             className="main-resize-handle"
             onMouseDown={handleMainSplitMouseDown}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-primary-500)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-surface-700)'}
+            onMouseEnter={(e) => {
+              const bar = e.currentTarget.querySelector('.resize-bar')
+              if (bar) bar.style.background = 'var(--color-primary-500)'
+            }}
+            onMouseLeave={(e) => {
+              const bar = e.currentTarget.querySelector('.resize-bar')
+              if (bar) bar.style.background = 'var(--color-surface-700)'
+            }}
           >
+            <div className="resize-bar" style={{
+              position: 'absolute',
+              width: previewPosition === 'bottom' ? '100%' : '4px',
+              height: previewPosition === 'bottom' ? '4px' : '100%',
+              left: previewPosition === 'bottom' ? 0 : '50%',
+              top: previewPosition === 'bottom' ? '50%' : 0,
+              transform: previewPosition === 'bottom' ? 'translateY(-50%)' : 'translateX(-50%)',
+              background: 'var(--color-surface-700)',
+              borderRadius: '2px',
+              transition: 'background 0.15s ease',
+            }} />
             <GripVertical 
               style={{ 
                 width: '12px', 
                 height: '12px', 
                 color: 'var(--color-surface-500)',
                 transform: previewPosition === 'bottom' ? 'rotate(90deg)' : 'none',
+                position: 'relative',
+                zIndex: 1,
+                pointerEvents: 'none',
               }} 
             />
           </div>
@@ -1165,15 +1288,16 @@ export const Editor = () => {
             <div style={{ position: 'absolute', inset: 0 }}>
               <PreviewSection 
                 previewKey={previewKey} 
-                html={html} 
-                css={css} 
-                js={js}
+                html={previewHtml} 
+                css={previewCss} 
+                js={previewJs}
                 previewDevice={previewDevice}
                 setPreviewDevice={setPreviewDevice}
                 showDeviceMenu={showDeviceMenu}
                 setShowDeviceMenu={setShowDeviceMenu}
                 getDeviceWidth={getDeviceWidth}
                 setPreviewKey={setPreviewKey}
+                onRefresh={runPreview}
                 isMobile={true}
               />
             </div>
@@ -1192,15 +1316,16 @@ export const Editor = () => {
           >
             <PreviewSection 
               previewKey={previewKey} 
-              html={html} 
-              css={css} 
-              js={js}
+              html={previewHtml} 
+              css={previewCss} 
+              js={previewJs}
               previewDevice={previewDevice}
               setPreviewDevice={setPreviewDevice}
               showDeviceMenu={showDeviceMenu}
               setShowDeviceMenu={setShowDeviceMenu}
               getDeviceWidth={getDeviceWidth}
               setPreviewKey={setPreviewKey}
+              onRefresh={runPreview}
             />
           </div>
         )}
@@ -1327,6 +1452,7 @@ const PreviewSection = ({
   previewDevice, setPreviewDevice, 
   showDeviceMenu, setShowDeviceMenu,
   getDeviceWidth, setPreviewKey,
+  onRefresh,
   isMobile = false
 }) => {
   return (
@@ -1440,7 +1566,7 @@ const PreviewSection = ({
           </div>
           {/* Refresh Button */}
           <button
-            onClick={() => setPreviewKey(prev => prev + 1)}
+            onClick={onRefresh || (() => setPreviewKey(prev => prev + 1))}
             style={{
               padding: '6px',
               color: 'var(--color-surface-500)',
@@ -1515,7 +1641,8 @@ const PreviewSection = ({
   )
 }
 
-// Resize Handle Component - draggable divider between panes
+// Resize Handle Component - draggable divider between code editor panes
+// Uses VS Code / CodePen approach: thin visible line with wider invisible hit area
 const ResizeHandle = ({ direction, onMouseDown }) => {
   const isVertical = direction === 'vertical'
   const [hovered, setHovered] = useState(false)
@@ -1523,31 +1650,51 @@ const ResizeHandle = ({ direction, onMouseDown }) => {
   return (
     <div
       style={{
-        width: isVertical ? '100%' : '6px',
-        height: isVertical ? '6px' : '100%',
+        // Outer wrapper provides a larger hit area (16px) for easier grabbing
+        width: isVertical ? '100%' : '16px',
+        height: isVertical ? '16px' : '100%',
         cursor: isVertical ? 'row-resize' : 'col-resize',
-        background: hovered ? 'var(--color-primary-400)' : '#e5e7eb',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        transition: 'background 0.15s ease',
         flexShrink: 0,
+        position: 'relative',
+        // Pull the excess hit area into neighboring panels to keep layout tight
+        [isVertical ? 'marginTop' : 'marginLeft']: '-5px',
+        [isVertical ? 'marginBottom' : 'marginRight']: '-5px',
+        zIndex: 5,
       }}
       onMouseDown={onMouseDown}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      {/* Visible divider line */}
+      <div
+        style={{
+          position: 'absolute',
+          width: isVertical ? '100%' : '4px',
+          height: isVertical ? '4px' : '100%',
+          borderRadius: '2px',
+          background: hovered ? 'var(--color-primary-400)' : '#e5e7eb',
+          transition: 'background 0.15s ease, transform 0.15s ease',
+          transform: hovered ? (isVertical ? 'scaleY(1.5)' : 'scaleX(1.5)') : 'scale(1)',
+        }}
+      />
+      {/* Grip icon on hover */}
       <div 
         style={{
+          position: 'relative',
+          zIndex: 1,
           opacity: hovered ? 1 : 0,
           transition: 'opacity 0.15s ease',
+          pointerEvents: 'none',
         }}
       >
         <GripVertical 
           style={{ 
             width: '12px', 
             height: '12px', 
-            color: hovered ? '#ffffff' : '#9ca3af',
+            color: hovered ? 'var(--color-primary-400)' : '#9ca3af',
             transform: isVertical ? 'rotate(90deg)' : 'none',
           }} 
         />
