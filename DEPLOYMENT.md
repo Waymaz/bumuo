@@ -53,11 +53,18 @@
 - [ ] All features tested on production
 - [ ] Mobile responsive verified
 - [ ] Share links work with production URL
+- [ ] Web Analytics enabled in Vercel dashboard
+- [ ] Web Analytics tracking verified (check Network tab for `/_vercel/insights/view` requests)
 
 ## Optional Enhancements
 
-### Performance
-- [ ] Enable Vercel Analytics
+### Performance & Monitoring
+- [ ] **Enable Vercel Web Analytics** (see [VERCEL_ANALYTICS.md](VERCEL_ANALYTICS.md) for detailed setup)
+  - Enable in Vercel dashboard (Analytics tab → Enable)
+  - Verify `@vercel/analytics/react` is imported in `src/main.jsx` ✅ (already configured)
+  - Monitor Core Web Vitals (LCP, FID, CLS)
+  - Track page views and user behavior
+  - Set up custom events for key interactions (Pro/Enterprise only)
 - [ ] Configure caching headers
 - [ ] Optimize images
 

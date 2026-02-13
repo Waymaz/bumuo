@@ -38,32 +38,38 @@ Welcome to BumuO! This guide will help you navigate all the documentation.
    - Post-deployment verification
    - Monitoring setup
 
+6. **[VERCEL_ANALYTICS.md](VERCEL_ANALYTICS.md)** ⭐ **NEW**
+   - Web Analytics setup guide
+   - Dashboard configuration
+   - Data tracking verification
+   - Custom events setup (Pro/Enterprise)
+
 ## 🔧 Technical Resources
 
-6. **[supabase-schema.sql](supabase-schema.sql)**
+7. **[supabase-schema.sql](supabase-schema.sql)**
    - Database schema
    - RLS policies
    - Indexes
    - Copy and run in Supabase SQL Editor
 
-7. **[vercel.json](vercel.json)**
+8. **[vercel.json](vercel.json)**
    - Vercel configuration
    - Build settings
    - Routing rules
 
-8. **[.env.example](.env.example)**
+9. **[.env.example](.env.example)**
    - Environment variables template
    - Copy to `.env` and fill in values
 
 ## 🐛 Troubleshooting
 
-9. **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**
-   - Common issues and solutions
-   - Setup problems
-   - Authentication issues
-   - Database problems
-   - Build/deploy errors
-   - Debug tips
+10. **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**
+    - Common issues and solutions
+    - Setup problems
+    - Authentication issues
+    - Database problems
+    - Build/deploy errors
+    - Debug tips
 
 ## 📂 Code Structure
 
@@ -158,6 +164,7 @@ BumuO Documentation
 2. Read **DEPLOYMENT.md** - Deployment checklist
 3. Setup Vercel account
 4. Deploy and test
+5. Read **VERCEL_ANALYTICS.md** - Setup Web Analytics to monitor your app
 
 ## 🔍 Finding Information
 
@@ -212,6 +219,12 @@ BumuO Documentation
 1. TROUBLESHOOTING.md → Find your issue
 2. Check browser console
 3. Verify .env and Supabase
+
+### Task: "I want to set up Web Analytics"
+1. VERCEL_ANALYTICS.md → Follow the setup guide
+2. Enable Web Analytics in Vercel dashboard
+3. Deploy to Vercel
+4. Verify tracking is working
 
 ## 💡 Pro Tips
 
